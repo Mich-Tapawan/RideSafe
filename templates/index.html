@@ -1,10 +1,13 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Imus Accident Dashboard</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style/style.css') }}" />
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='style/style.css') }}"
+    />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -75,7 +78,12 @@
       <div class="grid-container">
         <div class="panel panel--primary">
           <section class="toolbar" aria-label="Search and map toggle">
-            <button type="button" id="toggle-btn" class="btn btn--accent" data-view="bar">
+            <button
+              type="button"
+              id="toggle-btn"
+              class="btn btn--accent"
+              data-view="bar"
+            >
               View heat map
             </button>
             <div class="toolbar__search">
@@ -96,8 +104,18 @@
               <select name="hour" id="hour" class="select-hour">
                 <option value="hour" selected>Hour</option>
               </select>
-              <button type="button" id="search" class="btn btn--icon" aria-label="Run prediction">
-                <img src="{{ url_for('static', filename='assets/search.png') }}" alt="" width="22" height="22" />
+              <button
+                type="button"
+                id="search"
+                class="btn btn--icon"
+                aria-label="Run prediction"
+              >
+                <img
+                  src="{{ url_for('static', filename='assets/search.png') }}"
+                  alt=""
+                  width="22"
+                  height="22"
+                />
               </button>
             </div>
           </section>
@@ -110,7 +128,9 @@
               </div>
               <div class="plotly-wrap">{{bar_graph|safe}}</div>
             </div>
-            <div class="heat-map card-viz" id="heat-map" hidden>{{heat_map|safe}}</div>
+            <div class="heat-map card-viz" id="heat-map" hidden>
+              {{heat_map|safe}}
+            </div>
           </div>
 
           <section id="search-result" class="search-result card-viz" hidden>
@@ -120,12 +140,16 @@
               <p class="chance-label">Chances of accident</p>
               <h5 id="percent-result"></h5>
             </div>
-            <button type="button" id="report-btn" class="btn btn--link">Print summary report</button>
+            <button type="button" id="report-btn" class="btn btn--link">
+              Print summary report
+            </button>
           </section>
         </div>
 
         <aside class="panel panel--side chart-box">
-          <div class="donut-chart active" data-year="2022">{{chart_2022|safe}}</div>
+          <div class="donut-chart active" data-year="2022">
+            {{chart_2022|safe}}
+          </div>
           <div class="donut-chart" data-year="2023">{{chart_2023|safe}}</div>
           <div class="donut-chart" data-year="2024">{{chart_2024|safe}}</div>
           <div class="chart-bottom">
@@ -146,12 +170,32 @@
             <ul id="month-btns" class="month-grid" aria-label="Months"></ul>
           </div>
           <div class="toggle-year" role="group" aria-label="Year">
-            <button type="button" id="left" class="toggle-year-btns" aria-label="Previous year">
-              <img src="{{ url_for('static', filename='assets/left.png') }}" alt="" width="28" height="28" />
+            <button
+              type="button"
+              id="left"
+              class="toggle-year-btns"
+              aria-label="Previous year"
+            >
+              <img
+                src="{{ url_for('static', filename='assets/left.png') }}"
+                alt=""
+                width="28"
+                height="28"
+              />
             </button>
             <span id="year-value" class="year-label">2022</span>
-            <button type="button" id="right" class="toggle-year-btns" aria-label="Next year">
-              <img src="{{ url_for('static', filename='assets/right.png') }}" alt="" width="28" height="28" />
+            <button
+              type="button"
+              id="right"
+              class="toggle-year-btns"
+              aria-label="Next year"
+            >
+              <img
+                src="{{ url_for('static', filename='assets/right.png') }}"
+                alt=""
+                width="28"
+                height="28"
+              />
             </button>
           </div>
         </aside>

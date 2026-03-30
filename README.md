@@ -19,6 +19,8 @@ RideSafe is a comprehensive traffic accident analysis and prediction platform th
 <div align="center">
   <img src="static/screenshots/dashboard.jpg" alt="Dashboard" width="400">
   <img src="static/screenshots/heat-map.jpg" alt="Heatmap" width="400">
+   <img src="static/screenshots/prediction.jpg" alt="Prediction" width="400">
+   <img src="static/screenshots/chatbot.jpg" alt="Chatbot" width="400">
 </div>
 
 ## Features
