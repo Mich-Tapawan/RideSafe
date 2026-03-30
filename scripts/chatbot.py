@@ -1,32 +1,36 @@
 import os
 import json
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 
-genai.configure(api_key="AIzaSyDFDI3N5puygt-YZftJl7_eIPv7JwnwoUs")
+client = genai.Client(api_key="AIzaSyDFDI3N5puygt-YZftJl7_eIPv7JwnwoUs")
 
-# Create the model
-generation_config = {
-  "temperature": 1,
-  "top_p": 0.95,
-  "top_k": 40,
-  "max_output_tokens": 3000,
-  "response_mime_type": "application/json",
-}
-
-model = genai.GenerativeModel(
-  model_name="gemini-2.0-flash-exp",
-  generation_config=generation_config,
-  system_instruction="You are an assistant for an imus, philippines accident dashboard that concisely answers questions for users. Anything unrelated to road accidents are unanswerable to you.",
+# Create the model config
+generation_config = types.GenerateContentConfig(
+  temperature=1,
+  top_p=0.95,
+  top_k=40,
+  max_output_tokens=3000,
+  response_mime_type="application/json",
 )
 
+system_instruction = "You are an assistant for an imus, philippines accident dashboard that concisely answers questions for users. Anything unrelated to road accidents are unanswerable to you."
 
 
 def answer_gemini(prompt):
-    chat_session = model.start_chat(
-    history=[]
+    chat = client.chats.create(
+        model="gemini-2.0-flash-exp",
+        config=types.GenerateContentConfig(
+            system_instruction=system_instruction,
+            temperature=generation_config.temperature,
+            top_p=generation_config.top_p,
+            top_k=generation_config.top_k,
+            max_output_tokens=generation_config.max_output_tokens,
+            response_mime_type=generation_config.response_mime_type,
+        ),
     )
     print('Loading...')
-    response = chat_session.send_message(prompt)
+    response = chat.send_message(message=prompt)
 
     model_response = json.loads(response.text)
 

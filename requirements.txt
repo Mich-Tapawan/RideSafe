@@ -13,4 +13,4 @@ gunicorn
 openpyxl
 pdfkit
 spacy
-google-generativeai
+google-genai
