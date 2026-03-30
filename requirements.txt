@@ -2,7 +2,7 @@ pandas
 numpy
 flask
 flask_cors
-scikit-learn
+scikit-learn==1.5.2
 joblib
 plotly
 imblearn
@@ -12,3 +12,5 @@ folium
 gunicorn
 openpyxl
 pdfkit
+spacy
+google-generativeai

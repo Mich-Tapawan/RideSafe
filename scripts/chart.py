@@ -60,11 +60,15 @@ def generate_chart(FILE_PATH, year):
         ],
         paper_bgcolor="#00264d",
         plot_bgcolor="#00264d",
-        height=300,
-        width = 400,
-        margin=dict(l=50, r=50, t=50, b=50),
+        autosize=True,
+        height=280,
+        margin=dict(l=24, r=24, t=24, b=24),
         showlegend=False
     )
 
-    graph_html = fig.to_html(full_html=False, include_plotlyjs="cdn")
+    graph_html = fig.to_html(
+        full_html=False,
+        include_plotlyjs="cdn",
+        config={"responsive": True},
+    )
     return graph_html

@@ -1,5 +1,4 @@
 document.addEventListener("DOMContentLoaded", () => {
-  const chatbotIcon = document.getElementById("chatbot");
   const toggleBtn = document.getElementById("toggle-btn");
   const barGraph = document.getElementById("bar-graph");
   const heatMap = document.getElementById("heat-map");
@@ -10,60 +9,72 @@ document.addEventListener("DOMContentLoaded", () => {
   const totalValue = document.getElementById("total-value");
   const percentage = document.getElementById("percentage-value");
 
-  // Bar graph and Heat map toggle
-  toggleBtn.addEventListener("click", () => {
-    toggleBtn.innerHTML =
-      toggleBtn.innerHTML == "VIEW HEAT MAP"
-        ? "VIEW BAR GRAPH"
-        : "VIEW HEAT MAP";
+  const api = (path) => path;
 
-    if (toggleBtn.innerHTML == "VIEW HEAT MAP") {
-      barGraph.style.display = "block";
-      heatMap.style.display = "none";
+  function setSearchResultVisible(visible) {
+    searchResult.hidden = !visible;
+  }
+
+  function notifyVizResize() {
+    window.dispatchEvent(new Event("resize"));
+  }
+
+  toggleBtn.addEventListener("click", () => {
+    const showingBar = toggleBtn.dataset.view === "bar";
+    if (showingBar) {
+      toggleBtn.dataset.view = "heat";
+      toggleBtn.textContent = "View bar graph";
+      barGraph.setAttribute("hidden", "");
+      heatMap.removeAttribute("hidden");
     } else {
-      barGraph.style.display = "none";
-      heatMap.style.display = "block";
+      toggleBtn.dataset.view = "bar";
+      toggleBtn.textContent = "View heat map";
+      barGraph.removeAttribute("hidden");
+      heatMap.setAttribute("hidden", "");
     }
-    searchResult.style.display = "none";
+    setSearchResultVisible(false);
+    requestAnimationFrame(() => notifyVizResize());
   });
 
-  // Toggle between years
   const donutCharts = document.querySelectorAll(".donut-chart");
   const toggleYearBtns = document.querySelectorAll(".toggle-year-btns");
   const yearValue = document.getElementById("year-value");
   let currentYear = 2022;
 
   toggleYearBtns.forEach((btn) => {
-    btn.addEventListener("click", (event) => {
-      const btnDirection = event.target.id;
-      if (btnDirection == "left") {
-        currentYear = currentYear == 2022 ? 2024 : currentYear - 1;
+    btn.addEventListener("click", () => {
+      const direction = btn.id;
+      if (direction === "left") {
+        currentYear = currentYear === 2022 ? 2024 : currentYear - 1;
       } else {
-        currentYear = currentYear == 2024 ? 2022 : currentYear + 1;
+        currentYear = currentYear === 2024 ? 2022 : currentYear + 1;
       }
 
-      //
-      donutCharts.forEach((chart) => {
-        chart.classList.remove("active");
-      });
+      donutCharts.forEach((chart) => chart.classList.remove("active"));
 
-      // Show the chart for the selected year
-      if (currentYear == 2022) {
+      if (currentYear === 2022) {
         donutCharts[0].classList.add("active");
-      } else if (currentYear == 2023) {
+      } else if (currentYear === 2023) {
         donutCharts[1].classList.add("active");
       } else {
         donutCharts[2].classList.add("active");
       }
 
-      yearValue.innerHTML = currentYear;
-      monthName.innerHTML = "n/a";
-      totalValue.innerHTML = 0;
-      percentage.innerHTML = "0%";
+      yearValue.textContent = String(currentYear);
+      monthName.textContent = "n/a";
+      totalValue.textContent = "0";
+      percentage.textContent = "0%";
+
+      // Trigger Plotly to recalculate dimensions
+      requestAnimationFrame(() => {
+        notifyVizResize();
+        Plotly.Plots.resize(
+          document.querySelector(".donut-chart.active .plotly-graph-div"),
+        );
+      });
     });
   });
 
-  // Generate month buttons
   const monthBtns = document.getElementById("month-btns");
   const months = [
     "JAN",
@@ -80,17 +91,16 @@ document.addEventListener("DOMContentLoaded", () => {
     "DEC",
   ];
 
-  colors = ["#EBEB55", "#D4D700", "#55A630", "#007F5F"];
-  colorCount = 0;
+  const colors = ["#EBEB55", "#D4D700", "#55A630", "#007F5F"];
+  let colorCount = 0;
 
   months.forEach((month) => {
     const li = document.createElement("li");
     const p = document.createElement("p");
     const div = document.createElement("div");
 
-    p.innerHTML = month;
+    p.textContent = month;
 
-    //Change colors per quarter
     if (colorCount < 3) {
       div.style.backgroundColor = colors[0];
     } else if (colorCount < 6) {
@@ -113,9 +123,7 @@ document.addEventListener("DOMContentLoaded", () => {
     monthBtns.appendChild(li);
   });
 
-  // Search barangay accident percentage
   const barangay = document.getElementById("brgy");
-  const searchBox = document.querySelector("#search-box");
   const resultBox = document.querySelector(".result-box");
   const suggestions = document.querySelector(".result-box ul");
   const hour = document.getElementById("hour");
@@ -125,94 +133,88 @@ document.addEventListener("DOMContentLoaded", () => {
   const percentageText = document.getElementById("percent-result");
 
   searchBtn.addEventListener("click", () => {
-    if (barangay.value == "" || hour.value == "hour") {
+    if (barangay.value === "" || hour.value === "hour") {
       return;
-    } else {
-      fetchAccidentPercentage(barangay.value, hour.value);
-      barGraph.style.display = "none";
-      heatMap.style.display = "none";
-      searchResult.style.display = "flex";
     }
+    fetchAccidentPercentage(barangay.value, hour.value);
+    barGraph.setAttribute("hidden", "");
+    heatMap.setAttribute("hidden", "");
+    setSearchResultVisible(true);
   });
 
-  // Search bar Auto complete sugggestion list
-
-  barangay.onkeyup = async () => {
+  barangay.addEventListener("keyup", async () => {
     const barangayList = await fetchBarangayList();
-    resultBox.style.display = "block";
+    resultBox.hidden = false;
     let result = [];
-    let input = barangay.value;
-    let input_clean = input.replace(/\s+/g, ""); // Remove spaces
+    const input = barangay.value;
+    const inputClean = input.replace(/\s+/g, "");
 
     if (input.length) {
       suggestions.style.overflowY = "scroll";
       result = barangayList.filter((keyword) => {
         let matched = 0;
-        let keyword_clean = keyword.replace(/\s+/g, "");
+        const keywordClean = keyword.replace(/\s+/g, "");
 
-        for (let i = 0; i < input_clean.length; i++) {
-          if (input_clean[i].toLowerCase() == keyword_clean[i].toLowerCase()) {
+        for (let i = 0; i < inputClean.length; i++) {
+          if (inputClean[i].toLowerCase() === keywordClean[i].toLowerCase()) {
             matched++;
           }
         }
 
-        if (matched == input_clean.length) {
-          return keyword;
-        }
+        return matched === inputClean.length ? keyword : null;
       });
-      if (result.length == 0) {
+      if (result.length === 0) {
         suggestions.style.overflowY = "hidden";
       }
     } else {
       suggestions.style.overflowY = "hidden";
+      resultBox.hidden = true;
     }
     displaySuggestions(result);
-  };
+  });
 
-  // Selecting a suggestion
   function displaySuggestions(result) {
     suggestions.innerHTML = "";
     result.forEach((item) => {
       const li = document.createElement("li");
-      li.innerHTML = item;
+      li.textContent = item;
+      li.setAttribute("role", "option");
       li.addEventListener("click", () => {
-        barangay.value = li.innerHTML;
-        resultBox.style.display = "none";
+        barangay.value = item;
+        resultBox.hidden = true;
       });
       suggestions.appendChild(li);
     });
   }
 
-  // Creates drop down list of optoins for selecting hour
   for (let i = 0; i < 24; i++) {
     const option = document.createElement("option");
-    // Format the hour as two digits "00" to "23"
     const hourFormatted = String(i).padStart(2, "0") + ":00";
     option.setAttribute("value", hourFormatted);
-    option.innerHTML = hourFormatted;
+    option.textContent = hourFormatted;
     hour.appendChild(option);
   }
 
   reportBtn.addEventListener("click", () => {
-    getSummaryReport(barangayText.innerHTML);
+    getSummaryReport(barangayText.textContent);
   });
 
-  async function getSummaryReport(barangay) {
-    console.log(barangay);
+  async function getSummaryReport(barangayName) {
     try {
       const res = await fetch(
-        `http://localhost:5000/getSummaryReport/${barangay}`,
+        api(`/getSummaryReport/${encodeURIComponent(barangayName)}`),
         {
           method: "GET",
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
       if (res.ok) {
-        const blob = await res.blob(); // Get the PDF as a Blob
+        const blob = await res.blob();
         const link = document.createElement("a");
-        link.href = URL.createObjectURL(blob); // Create a URL for the blob
-        link.download = "summary_report.pdf"; // Set the file name for download
-        link.click(); // Trigger the download
+        link.href = URL.createObjectURL(blob);
+        link.download = "summary_report.pdf";
+        link.click();
+        URL.revokeObjectURL(link.href);
       } else {
         console.error("Error fetching summary report:", res.statusText);
       }
@@ -222,34 +224,41 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   async function fetchMonthData(year, month) {
-    console.log(month, year);
     try {
-      let response = await fetch("http://localhost:5000/getMonthData", {
+      const response = await fetch(api("/getMonthData"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ year: year, month: month }),
+        body: JSON.stringify({ year, month }),
       });
-      let monthData = await response.json();
-      monthName.innerHTML = month;
-      totalValue.innerHTML = monthData.totalAccidents;
-      percentage.innerHTML = `${monthData.percentage}%`;
+      const monthData = await response.json();
+      monthName.textContent = month;
+      totalValue.textContent = monthData.totalAccidents;
+      percentage.textContent = `${monthData.percentage}%`;
     } catch (error) {
       console.error("Error fetching month data: ", error);
     }
   }
 
-  async function fetchAccidentPercentage(barangay, hour) {
+  async function fetchAccidentPercentage(barangayValue, hourValue) {
     try {
-      let response = await fetch("http://localhost:5000/predict", {
+      const response = await fetch(api("/predict"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ barangay: barangay.toUpperCase(), hour: hour }),
+        body: JSON.stringify({
+          barangay: barangayValue.toUpperCase(),
+          hour: hourValue,
+        }),
       });
 
-      let data = await response.json();
-      barangayText.innerHTML = barangay.toUpperCase();
-      hourText.innerHTML = `HOUR: ${hour}`;
-      percentageText.innerHTML = data;
+      const data = await response.json();
+      barangayText.textContent = barangayValue.toUpperCase();
+      hourText.textContent = `Hour: ${hourValue}`;
+      if (!response.ok && data && typeof data === "object" && data.error) {
+        percentageText.textContent = data.error;
+        return;
+      }
+      percentageText.textContent =
+        typeof data === "string" ? data : String(data);
     } catch (error) {
       console.error("Error fetching accident percentage: ", error);
     }
@@ -257,15 +266,16 @@ document.addEventListener("DOMContentLoaded", () => {
 
   async function fetchBarangayList() {
     try {
-      let response = await fetch("http://localhost:5000/getBarangayList", {
+      const response = await fetch(api("/getBarangayList"), {
         method: "GET",
         headers: { "Content-Type": "application/json" },
       });
 
-      let data = await response.json();
+      const data = await response.json();
       return data;
     } catch (error) {
       console.error("Error fetcing barangay list: ", error);
+      return [];
     }
   }
 });
