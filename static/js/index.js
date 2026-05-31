@@ -134,6 +134,8 @@ document.addEventListener("DOMContentLoaded", () => {
   const percentageText = document.getElementById("percent-result");
 
   let barangayListCache = null;
+  let lastReportBarangay = null;
+  let lastReportHour = null;
 
   function hideSuggestions() {
     resultBox.hidden = true;
@@ -231,31 +233,74 @@ document.addEventListener("DOMContentLoaded", () => {
     hour.appendChild(option);
   }
 
+  function updateReportButtonState() {
+    const ready =
+      lastReportBarangay &&
+      lastReportHour &&
+      barangayText.textContent.trim() !== "" &&
+      barangayText.textContent.trim().toLowerCase() !== "n/a";
+    reportBtn.disabled = !ready;
+    reportBtn.setAttribute("aria-disabled", String(!ready));
+  }
+
+  updateReportButtonState();
+
   reportBtn.addEventListener("click", () => {
-    getSummaryReport(barangayText.textContent);
+    if (reportBtn.disabled || !lastReportBarangay) {
+      return;
+    }
+    getSummaryReport(lastReportBarangay, lastReportHour);
   });
 
-  async function getSummaryReport(barangayName) {
+  async function getSummaryReport(barangayName, hourValue) {
+    const params = new URLSearchParams();
+    if (hourValue) {
+      params.set("hour", hourValue.split(":")[0]);
+    }
+    const query = params.toString();
+    const url = api(
+      `/getSummaryReport/${encodeURIComponent(barangayName)}${query ? `?${query}` : ""}`,
+    );
+
+    const previousLabel = reportBtn.textContent;
+    reportBtn.disabled = true;
+    reportBtn.textContent = "Generating report…";
+
     try {
-      const res = await fetch(
-        api(`/getSummaryReport/${encodeURIComponent(barangayName)}`),
-        {
-          method: "GET",
-          headers: { "Content-Type": "application/json" },
-        },
-      );
+      const res = await fetch(url, { method: "GET" });
       if (res.ok) {
         const blob = await res.blob();
+        let filename = "RideSafe_summary.pdf";
+        const disposition = res.headers.get("Content-Disposition");
+        if (disposition) {
+          const match = disposition.match(/filename\*?=(?:UTF-8''|")?([^";\n]+)/i);
+          if (match) {
+            filename = decodeURIComponent(match[1].replace(/"/g, "").trim());
+          }
+        }
         const link = document.createElement("a");
         link.href = URL.createObjectURL(blob);
-        link.download = "summary_report.pdf";
+        link.download = filename;
         link.click();
         URL.revokeObjectURL(link.href);
       } else {
-        console.error("Error fetching summary report:", res.statusText);
+        let message = res.statusText;
+        try {
+          const err = await res.json();
+          if (err && err.error) {
+            message = err.error;
+          }
+        } catch {
+          /* ignore */
+        }
+        alert(`Could not generate report: ${message}`);
       }
     } catch (error) {
       console.error("Error fetching summary report: ", error);
+      alert("Could not generate report. Please try again.");
+    } finally {
+      reportBtn.textContent = previousLabel;
+      updateReportButtonState();
     }
   }
 
@@ -291,10 +336,16 @@ document.addEventListener("DOMContentLoaded", () => {
       hourText.textContent = `Hour: ${hourValue}`;
       if (!response.ok && data && typeof data === "object" && data.error) {
         percentageText.textContent = data.error;
+        lastReportBarangay = null;
+        lastReportHour = null;
+        updateReportButtonState();
         return;
       }
       percentageText.textContent =
         typeof data === "string" ? data : String(data);
+      lastReportBarangay = barangayValue.toUpperCase();
+      lastReportHour = hourValue;
+      updateReportButtonState();
     } catch (error) {
       console.error("Error fetching accident percentage: ", error);
     }

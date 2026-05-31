@@ -220,8 +220,15 @@ body {
   padding: 0.5rem 0;
 }
 
-.btn--link:hover {
+.btn--link:hover:not(:disabled) {
   color: var(--accent);
+}
+
+.btn--link:disabled {
+  color: var(--text-muted);
+  cursor: not-allowed;
+  text-decoration: none;
+  opacity: 0.65;
 }
 
 .search-box {

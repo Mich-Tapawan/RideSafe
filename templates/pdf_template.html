@@ -1,74 +1,386 @@
-<p style="font-size: 20px; line-height: 1.6; margin: 10px 0">
-  <strong style="color: #555">Barangay:</strong> {{barangay_name}}
-</p>
-<p style="font-size: 20px; line-height: 1.6; margin: 10px 0">
-  <strong style="color: #555">Peak Hour:</strong> {{peak_hour}}:00
-</p>
-<p style="font-size: 20px; line-height: 1.6; margin: 10px 0">
-  <strong style="color: #555">Lowest Hour:</strong> {{lowest_hour}}:00
-</p>
-<p style="font-size: 20px; line-height: 1.6; margin: 10px 0">
-  <strong style="color: #555">Peak Quarter:</strong> {{peak_quarter}}
-</p>
-<p style="font-size: 20px; line-height: 1.6; margin: 10px 0">
-  <strong style="color: #555">Lowest Quarter:</strong> {{lowest_quarter}}
-</p>
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>RideSafe Summary — {{ barangay_name }}</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        font-family: "Segoe UI", Helvetica, Arial, sans-serif;
+        color: #0f172a;
+        margin: 0;
+        padding: 0;
+        font-size: 11pt;
+        line-height: 1.45;
+      }
+      .header {
+        background: #f1f5f9;
+        border-bottom: 4px solid #3347e6;
+        color: #0f172a;
+        padding: 28px 32px;
+        margin: -8px -8px 24px -8px;
+      }
+      .header h1 {
+        margin: 0 0 6px;
+        font-size: 22pt;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+        color: #3347e6;
+      }
+      .header .subtitle {
+        margin: 0;
+        font-size: 11pt;
+        color: #475569;
+      }
+      .meta {
+        display: table;
+        width: 100%;
+        margin-bottom: 20px;
+        font-size: 9.5pt;
+        color: #64748b;
+      }
+      .meta span {
+        display: table-cell;
+      }
+      .meta span:last-child {
+        text-align: right;
+      }
+      .kpi-grid {
+        display: table;
+        width: 100%;
+        border-spacing: 10px 0;
+        margin-bottom: 22px;
+      }
+      .kpi {
+        display: table-cell;
+        width: 25%;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 14px 12px;
+        vertical-align: top;
+      }
+      .kpi-label {
+        font-size: 8.5pt;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: #64748b;
+        margin-bottom: 4px;
+      }
+      .kpi-value {
+        font-size: 16pt;
+        font-weight: 700;
+        color: #3347e6;
+        margin: 0;
+      }
+      .kpi-detail {
+        font-size: 9pt;
+        color: #475569;
+        margin: 4px 0 0;
+      }
+      .risk-low {
+        color: #007f5f;
+      }
+      .risk-moderate {
+        color: #b8860b;
+      }
+      .risk-high {
+        color: #c0392b;
+      }
+      h2 {
+        font-size: 13pt;
+        color: #3347e6;
+        border-bottom: 2px solid #e2e8f0;
+        padding-bottom: 6px;
+        margin: 24px 0 12px;
+      }
+      .chart-wrap {
+        text-align: center;
+        margin: 12px 0 20px;
+      }
+      .chart-wrap img {
+        max-width: 100%;
+        height: auto;
+      }
+      .legend {
+        font-size: 8.5pt;
+        color: #64748b;
+        margin-top: 6px;
+      }
+      .legend span {
+        margin-right: 14px;
+      }
+      .swatch {
+        display: inline-block;
+        width: 10px;
+        height: 10px;
+        border-radius: 2px;
+        margin-right: 4px;
+        vertical-align: middle;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 16px;
+        font-size: 9.5pt;
+      }
+      th {
+        background: #3347e6;
+        color: #fff;
+        padding: 8px 10px;
+        text-align: left;
+        font-weight: 600;
+      }
+      td {
+        padding: 7px 10px;
+        border-bottom: 1px solid #e2e8f0;
+      }
+      tr:nth-child(even) td {
+        background: #f8fafc;
+      }
+      tr.row-peak td {
+        background: #ede9fe !important;
+        font-weight: 600;
+      }
+      tr.row-lowest td {
+        background: #e0f7fa !important;
+      }
+      tr.row-selected td {
+        background: #fff3e0 !important;
+        font-weight: 600;
+      }
+      .two-col {
+        display: table;
+        width: 100%;
+        border-spacing: 16px 0;
+      }
+      .col {
+        display: table-cell;
+        width: 50%;
+        vertical-align: top;
+      }
+      .recommendations {
+        background: #f1f5f9;
+        border-left: 4px solid #3347e6;
+        padding: 14px 16px;
+        margin: 16px 0;
+      }
+      .recommendations ul {
+        margin: 8px 0 0;
+        padding-left: 18px;
+      }
+      .recommendations li {
+        margin-bottom: 6px;
+      }
+      .footer {
+        margin-top: 28px;
+        padding-top: 12px;
+        border-top: 1px solid #e2e8f0;
+        font-size: 8pt;
+        color: #94a3b8;
+        text-align: center;
+      }
+      .highlight-box {
+        background: #fff7ed;
+        border: 1px solid #fdba74;
+        border-radius: 8px;
+        padding: 12px 14px;
+        margin-bottom: 18px;
+      }
+      .highlight-box strong {
+        color: #c2410c;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="header">
+      <h1>{{ barangay_name }}</h1>
+      <p class="subtitle">RideSafe Traffic Accident Summary Report · Imus City</p>
+    </div>
 
-<table style="width: 100%; border-collapse: collapse; margin-top: 20px">
-  <thead>
-    <tr>
-      <th
-        style="
-          padding: 10px;
-          text-align: left;
-          font-size: 14px;
-          border: 1px solid #ddd;
-          background-color: #f4f4f4;
-          font-weight: bold;
-          text-align: center;
-        "
-      >
-        Hour
-      </th>
-      <th
-        style="
-          padding: 10px;
-          text-align: left;
-          font-size: 14px;
-          border: 1px solid #ddd;
-          background-color: #f4f4f4;
-          font-weight: bold;
-          text-align: center;
-        "
-      >
-        Accident Probability
-      </th>
-    </tr>
-  </thead>
-  <tbody>
-    {% for hour, percentage in predictions.items() %}
-    <tr style="background-color: #f9f9f9">
-      <td
-        style="
-          padding: 10px;
-          text-align: center;
-          font-size: 14px;
-          border: 1px solid #ddd;
-        "
-      >
-        {{ hour }}:00
-      </td>
-      <td
-        style="
-          padding: 10px;
-          text-align: center;
-          font-size: 14px;
-          border: 1px solid #ddd;
-        "
-      >
-        {{ percentage }}%
-      </td>
-    </tr>
-    {% endfor %}
-  </tbody>
-</table>
+    <div class="meta">
+      <span>Generated {{ generated_at }}</span>
+      <span>Data: {{ data_range }}</span>
+    </div>
+
+    <div class="kpi-grid">
+      <div class="kpi">
+        <div class="kpi-label">Total incidents</div>
+        <p class="kpi-value">{{ total_incidents }}</p>
+        <p class="kpi-detail">{{ share_percent }}% of city total ({{ city_total }})</p>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Peak hour (ML)</div>
+        <p class="kpi-value">{{ peak_hour }}:00</p>
+        <p class="kpi-detail">
+          {{ peak_percent }}% ·
+          <span class="risk-{{ peak_risk|lower }}">{{ peak_risk }}</span>
+        </p>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Lowest hour (ML)</div>
+        <p class="kpi-value">{{ lowest_hour }}:00</p>
+        <p class="kpi-detail">
+          {{ lowest_percent }}% ·
+          <span class="risk-{{ lowest_risk|lower }}">{{ lowest_risk }}</span>
+        </p>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Peak quarter (history)</div>
+        <p class="kpi-value" style="font-size: 13pt">{{ peak_quarter }}</p>
+        <p class="kpi-detail">Lowest: {{ lowest_quarter }}</p>
+      </div>
+    </div>
+
+    {% if selected_hour %}
+    <div class="highlight-box">
+      <strong>Your selected time:</strong> {{ selected_hour }}:00 —
+      {{ selected_percent }}% predicted risk ({{ selected_risk }}).
+      City average at this hour: {{ city_avg_selected }}%.
+    </div>
+    {% endif %}
+
+    <h2>Hourly risk profile</h2>
+    <div class="chart-wrap">
+      <img
+        src="data:image/png;base64,{{ chart_base64 }}"
+        alt="Hourly accident probability chart"
+      />
+      <div class="legend">
+        <span><span class="swatch" style="background: #3347e6"></span> Standard</span>
+        <span><span class="swatch" style="background: #9351e4"></span> Peak hour</span>
+        <span><span class="swatch" style="background: #00dbf9"></span> Lowest hour</span>
+        {% if selected_hour %}
+        <span><span class="swatch" style="background: #e67e22"></span> Selected hour</span>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="two-col">
+      <div class="col">
+        <h2>Top 3 highest-risk hours</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Hour</th>
+              <th>Probability</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in top_hours %}
+            <tr>
+              <td>{{ row.hour }}:00</td>
+              <td>{{ row.percent }}%</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div class="col">
+        <h2>Top 3 lowest-risk hours</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Hour</th>
+              <th>Probability</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in bottom_hours %}
+            <tr>
+              <td>{{ row.hour }}:00</td>
+              <td>{{ row.percent }}%</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="two-col">
+      <div class="col">
+        <h2>Incidents by quarter</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Quarter</th>
+              <th>Count</th>
+              <th>Share</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for q in quarter_breakdown %}
+            <tr>
+              <td>{{ q.label }}</td>
+              <td>{{ q.count }}</td>
+              <td>{{ q.percent }}%</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div class="col">
+        <h2>Incidents by year</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Year</th>
+              <th>Count</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for y in year_breakdown %}
+            <tr>
+              <td>{{ y.year }}</td>
+              <td>{{ y.count }}</td>
+            </tr>
+            {% endfor %}
+            {% if not year_breakdown %}
+            <tr>
+              <td colspan="2">No historical records for this barangay.</td>
+            </tr>
+            {% endif %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <h2>Full hourly breakdown</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Hour</th>
+          <th>Probability</th>
+          <th>Risk level</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in hourly_rows %}
+        <tr
+          class="{% if row.is_selected %}row-selected{% elif row.is_peak %}row-peak{% elif row.is_lowest %}row-lowest{% endif %}"
+        >
+          <td>{{ row.hour }}:00</td>
+          <td>{{ row.percent }}%</td>
+          <td class="risk-{{ row.risk|lower }}">{{ row.risk }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <div class="recommendations">
+      <strong>Key takeaways</strong>
+      <ul>
+        {% for item in recommendations %}
+        <li>{{ item }}</li>
+        {% endfor %}
+      </ul>
+    </div>
+
+    <div class="footer">
+      RideSafe · Random Forest accident probability model · Imus City traffic incident
+      data · This report is for informational purposes only.
+    </div>
+  </body>
+</html>

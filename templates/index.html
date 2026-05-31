@@ -131,8 +131,15 @@
               <p class="chance-label">Chances of accident</p>
               <h5 id="percent-result"></h5>
             </div>
-            <button type="button" id="report-btn" class="btn btn--link">
-              Print summary report
+            <button
+              type="button"
+              id="report-btn"
+              class="btn btn--link"
+              disabled
+              aria-disabled="true"
+              title="Run a prediction first to download a report"
+            >
+              Download summary report (PDF)
             </button>
           </section>
         </div>

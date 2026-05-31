@@ -28,7 +28,7 @@ RideSafe is a traffic safety platform that uses historical incident data (2022â€
 
 - **Accident prediction**: ML-powered risk assessment by barangay and hour of day using a Random Forest classifier
 - **Interactive dashboards**: Dynamic bar graphs, heatmaps, and time-series charts built with Plotly and Folium
-- **PDF reports**: Generate stakeholder reports with peak-hour analysis and barangay-level trends
+- **PDF reports**: Multi-section barangay summary (KPIs, hourly chart, historical breakdown, ML recommendations) â€” run a prediction first, then download
 - **Geospatial analysis**: Accident density mapping using GeoJSON data of Imus barangays
 
 ## Tech Stack
@@ -49,6 +49,7 @@ RideSafe is a traffic safety platform that uses historical incident data (2022â€
   - Windows: Download from [wkhtmltopdf.org](https://wkhtmltopdf.org/downloads.html)
   - macOS: `brew install wkhtmltopdf`
   - Linux: `apt-get install wkhtmltopdf`
+  - Optional: set `WKHTMLTOPDF_PATH` in the environment if the binary is not on PATH
 
 ### Installation
 
@@ -131,7 +132,7 @@ imusaccident/
 | `/getMonthData` | POST | Monthly accident statistics (`year`, `month`) |
 | `/predict` | POST | ML accident probability (`barangay`, `hour`) |
 | `/getBarangayList` | GET | List of barangays from incident data |
-| `/getSummaryReport/<barangay>` | GET | PDF summary report download |
+| `/getSummaryReport/<barangay>` | GET | PDF summary report (`?hour=8` optional, highlights selected hour) |
 
 ## Machine Learning Model
 

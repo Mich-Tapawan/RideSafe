@@ -2,6 +2,9 @@ from flask import Flask, render_template, request, jsonify, send_file
 from flask_cors import CORS
 from datetime import datetime
 import pdfkit
+import shutil
+import re
+from io import BytesIO
 from scripts.bar_graph import generate_bar_graph
 from scripts.heat_map import generate_heat_map
 from scripts.chart import generate_chart
@@ -92,27 +95,74 @@ def get_barangay_list():
     except Exception as e:
         return jsonify('Unable to generate list', e), 500
 
+def _wkhtmltopdf_config():
+    path = os.environ.get("WKHTMLTOPDF_PATH")
+    if path and os.path.isfile(path):
+        return pdfkit.configuration(wkhtmltopdf=path)
+    default_win = r"C:\Program Files\wkhtmltopdf\bin\wkhtmltopdf.exe"
+    if os.path.isfile(default_win):
+        return pdfkit.configuration(wkhtmltopdf=default_win)
+    found = shutil.which("wkhtmltopdf")
+    if found:
+        return pdfkit.configuration(wkhtmltopdf=found)
+    raise FileNotFoundError(
+        "wkhtmltopdf not found. Install wkhtmltopdf or set WKHTMLTOPDF_PATH."
+    )
+
+
 @app.route('/getSummaryReport/<string:barangay>', methods=['GET'])
 def get_summary_report(barangay):
     try:
-        summary_report =  generate_summary_report(barangay)
-        rendered_html = render_template('pdf_template.html', barangay_name=barangay,
-                                         peak_hour=summary_report["peak_hour"],
-                                           lowest_hour=summary_report["lowest_hour"],
-                                             peak_quarter = summary_report["peak_quarter"],
-                                               lowest_quarter = summary_report["lowest_quarter"],
-                                                 predictions=summary_report["predictions"])
-        
-        path_to_wkhtmltopdf = r'C:\Program Files\wkhtmltopdf\bin\wkhtmltopdf.exe'
-        config = pdfkit.configuration(wkhtmltopdf=path_to_wkhtmltopdf)
-        pdf = pdfkit.from_string(rendered_html, False, configuration=config)
-         # Create a temporary file for the PDF
-        pdf_file = os.path.join(os.getcwd(), "summary_report.pdf")
-        with open(pdf_file, "wb") as f:
-            f.write(pdf)
-        return send_file(pdf_file, as_attachment=True, download_name="summary_report.pdf", mimetype="application/pdf")
+        selected_hour = request.args.get("hour")
+        if selected_hour is not None:
+            try:
+                selected_hour = int(str(selected_hour).split(":")[0])
+            except (ValueError, IndexError):
+                return jsonify({"error": "Invalid hour query parameter."}), 400
+
+        report = generate_summary_report(
+            EXCEL_FILE_PATH,
+            barangay,
+            accident_model,
+            selected_hour=selected_hour,
+        )
+        rendered_html = render_template("pdf_template.html", **report)
+
+        pdf_options = {
+            "page-size": "A4",
+            "margin-top": "12mm",
+            "margin-right": "12mm",
+            "margin-bottom": "18mm",
+            "margin-left": "12mm",
+            "encoding": "UTF-8",
+            "enable-local-file-access": None,
+            "footer-center": "RideSafe · Page [page] of [topage]",
+            "footer-font-size": "8",
+        }
+        config = _wkhtmltopdf_config()
+        pdf_bytes = pdfkit.from_string(
+            rendered_html,
+            False,
+            configuration=config,
+            options=pdf_options,
+        )
+
+        safe_name = re.sub(r"[^\w\-]+", "_", report["barangay_name"])[:40]
+        download_name = f"RideSafe_{safe_name}_summary.pdf"
+
+        return send_file(
+            BytesIO(pdf_bytes),
+            as_attachment=True,
+            download_name=download_name,
+            mimetype="application/pdf",
+        )
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    except FileNotFoundError as e:
+        return jsonify({"error": str(e)}), 500
     except Exception as e:
-        return jsonify('Unable to generate summary report', e), 500
+        logging.error(f"Error in get_summary_report: {e}")
+        return jsonify({"error": "Unable to generate summary report."}), 500
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 5000)), debug=True)

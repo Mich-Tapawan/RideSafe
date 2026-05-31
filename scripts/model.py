@@ -85,18 +85,25 @@ class AccidentModel:
             print(f"Error in load_model: {str(e)}")
             raise e
 
-    def predict_accident_chance(self, barangay, hour):
+    def _predict_probability_value(self, barangay, hour):
         if self.model is None or self.encoder is None:
             raise ValueError("Model or encoder is not loaded. Call 'load_model' first.")
         if barangay not in self.barangays:
             raise ValueError(f"Invalid barangay: {barangay}. Available barangays: {list(self.barangays)}")
 
-        # Prepare input for prediction
         barangay_idx = np.where(self.barangays == barangay)[0][0]
         input_data = np.zeros(len(self.barangays) + 2)
         input_data[barangay_idx] = 1
         input_data[-2:] = [hour, 1 if 7 <= hour <= 9 or 17 <= hour <= 19 else 0]
 
-        # Predict accident chance
         probs = self.model.predict_proba([input_data])
-        return f'{round(probs[0][1] * 100, 2)}%'
+        return round(probs[0][1] * 100, 2)
+
+    def predict_accident_chance(self, barangay, hour):
+        return f'{self._predict_probability_value(barangay, hour)}%'
+
+    def predict_all_hours(self, barangay):
+        return {
+            str(hour).zfill(2): self._predict_probability_value(barangay, hour)
+            for hour in range(24)
+        }
