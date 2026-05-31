@@ -9,7 +9,6 @@ from scripts.month_data import generate_month_list
 from scripts.barangay_list import generate_barangay_list
 from scripts.model import AccidentModel
 from scripts.summary_report import generate_summary_report
-from scripts.nlp import answer_prompt
 import logging
 import os
 
@@ -31,22 +30,6 @@ def home():
     chart_2024_html = generate_chart(EXCEL_FILE_PATH, 2024)
 
     return render_template('index.html', bar_graph = bar_graph_html, chart_2022 = chart_2022_html, chart_2023 = chart_2023_html, chart_2024 = chart_2024_html, heat_map = heat_map_html)
-
-@app.route('/chatbot')
-def chatbot():
-    return render_template('nlp.html')
-
-@app.route('/handlePrompt', methods=['POST'])
-def handle_prompt():
-    data = request.get_json()
-    prompt = data.get("prompt")
-    
-    if not prompt:
-        return jsonify({"error": "Prompt is required"}), 400
-    
-    # Pass the prompt to answer_prompt and return the response
-    response = answer_prompt(prompt)
-    return jsonify(response)
 
 @app.route('/getMonthData', methods=['POST'])
 def get_month_data():

@@ -12,5 +12,3 @@ folium
 gunicorn
 openpyxl
 pdfkit
-google-genai
-supabase
