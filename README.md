@@ -128,13 +128,13 @@ imusaccident/
 
 ## API Endpoints
 
-| Endpoint | Method | Description |
-| -------- | ------ | ----------- |
-| `/` | GET | Main dashboard with visualizations |
-| `/getMonthData` | POST | Monthly accident statistics (`year`, `month`) |
-| `/predict` | POST | ML accident probability (`barangay`, `hour`) |
-| `/getBarangayList` | GET | List of barangays from incident data |
-| `/getSummaryReport/<barangay>` | GET | PDF summary report (`?hour=8` optional, highlights selected hour) |
+| Endpoint                       | Method | Description                                                       |
+| ------------------------------ | ------ | ----------------------------------------------------------------- |
+| `/`                            | GET    | Main dashboard with visualizations                                |
+| `/getMonthData`                | POST   | Monthly accident statistics (`year`, `month`)                     |
+| `/predict`                     | POST   | ML accident probability (`barangay`, `hour`)                      |
+| `/getBarangayList`             | GET    | List of barangays from incident data                              |
+| `/getSummaryReport/<barangay>` | GET    | PDF summary report (`?hour=8` optional, highlights selected hour) |
 
 ## Machine Learning Model
 
@@ -144,55 +144,6 @@ The prediction model uses:
 - **Features**: Barangay, hour of day, peak hour indicator
 - **Data balance**: SMOTE (Synthetic Minority Over-sampling Technique)
 - **Training data**: Traffic incidents from 2022–2024
-
-## Deployment
-
-### Deploy to Render (Docker — recommended)
-
-This app uses **Docker** on Render so `wkhtmltopdf`, GeoPandas, and the ML stack work in production.
-
-**Before you deploy**, ensure these are committed to git:
-
-- `traffic-incident.xlsx` (project root)
-- `scripts/accident_prediction_model.pkl`
-- `scripts/barangay_encoder.pkl`
-- `static/assets/Imus.geojson`
-
-**Option A — Blueprint (`render.yaml`)**
-
-1. Push the repo to GitHub.
-2. In [Render Dashboard](https://dashboard.render.com) → **New** → **Blueprint** → connect the repo.
-3. Render reads [`render.yaml`](render.yaml) and creates the web service.
-4. Wait for the Docker build (first build may take several minutes).
-
-**Option B — Manual Web Service**
-
-1. **New** → **Web Service** → connect GitHub repo.
-2. **Environment:** Docker  
-3. **Dockerfile path:** `./Dockerfile`  
-4. **Instance type:** Free (or paid for always-on / faster builds).  
-5. Environment variables (usually set by the Dockerfile; override if needed):
-   - `WKHTMLTOPDF_PATH` = `/usr/bin/wkhtmltopdf`
-6. Deploy.
-
-The container runs:
-
-`gunicorn --bind 0.0.0.0:$PORT --workers 2 --timeout 120 app:app`
-
-**After deploy:** open your `*.onrender.com` URL. Run a prediction, then test **Download summary report (PDF)**.
-
-**Free tier notes:** The service sleeps after inactivity; the first request after sleep can take 30–90 seconds while the model and charts load.
-
-### Deploy to Heroku
-
-```bash
-heroku login
-heroku create your-app-name
-git push heroku main
-heroku logs --tail
-```
-
-The [`Procfile`](Procfile) binds to `$PORT` for compatibility with Heroku and similar hosts.
 
 ## License
 
