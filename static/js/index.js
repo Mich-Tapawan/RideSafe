@@ -124,6 +124,7 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   const barangay = document.getElementById("brgy");
+  const searchBox = document.getElementById("search-box");
   const resultBox = document.querySelector(".result-box");
   const suggestions = document.querySelector(".result-box ul");
   const hour = document.getElementById("hour");
@@ -132,60 +133,95 @@ document.addEventListener("DOMContentLoaded", () => {
   const hourText = document.getElementById("hr-value");
   const percentageText = document.getElementById("percent-result");
 
+  let barangayListCache = null;
+
+  function hideSuggestions() {
+    resultBox.hidden = true;
+    suggestions.innerHTML = "";
+  }
+
+  function filterBarangays(list, input) {
+    const inputClean = input.replace(/\s+/g, "");
+    if (!inputClean.length) {
+      return list;
+    }
+
+    return list.filter((keyword) => {
+      const keywordClean = keyword.replace(/\s+/g, "");
+      let matched = 0;
+
+      for (let i = 0; i < inputClean.length; i++) {
+        if (inputClean[i].toLowerCase() === keywordClean[i].toLowerCase()) {
+          matched++;
+        }
+      }
+
+      return matched === inputClean.length;
+    });
+  }
+
+  function showSuggestions(matches) {
+    if (!matches.length) {
+      hideSuggestions();
+      return;
+    }
+
+    resultBox.hidden = false;
+    suggestions.style.overflowY = matches.length > 8 ? "scroll" : "hidden";
+    suggestions.innerHTML = "";
+
+    matches.forEach((item) => {
+      const li = document.createElement("li");
+      li.textContent = item;
+      li.setAttribute("role", "option");
+      li.addEventListener("click", () => {
+        barangay.value = item;
+        hideSuggestions();
+      });
+      suggestions.appendChild(li);
+    });
+  }
+
+  async function getBarangayListCached() {
+    if (barangayListCache === null) {
+      barangayListCache = await fetchBarangayList();
+    }
+    return barangayListCache;
+  }
+
   searchBtn.addEventListener("click", () => {
     if (barangay.value === "" || hour.value === "hour") {
       return;
     }
+    hideSuggestions();
     fetchAccidentPercentage(barangay.value, hour.value);
     barGraph.setAttribute("hidden", "");
     heatMap.setAttribute("hidden", "");
     setSearchResultVisible(true);
   });
 
-  barangay.addEventListener("keyup", async () => {
-    const barangayList = await fetchBarangayList();
-    resultBox.hidden = false;
-    let result = [];
-    const input = barangay.value;
-    const inputClean = input.replace(/\s+/g, "");
-
-    if (input.length) {
-      suggestions.style.overflowY = "scroll";
-      result = barangayList.filter((keyword) => {
-        let matched = 0;
-        const keywordClean = keyword.replace(/\s+/g, "");
-
-        for (let i = 0; i < inputClean.length; i++) {
-          if (inputClean[i].toLowerCase() === keywordClean[i].toLowerCase()) {
-            matched++;
-          }
-        }
-
-        return matched === inputClean.length ? keyword : null;
-      });
-      if (result.length === 0) {
-        suggestions.style.overflowY = "hidden";
-      }
-    } else {
-      suggestions.style.overflowY = "hidden";
-      resultBox.hidden = true;
-    }
-    displaySuggestions(result);
+  barangay.addEventListener("focus", async () => {
+    const list = await getBarangayListCached();
+    const input = barangay.value.trim();
+    const matches = input.length ? filterBarangays(list, input) : list;
+    showSuggestions(matches);
   });
 
-  function displaySuggestions(result) {
-    suggestions.innerHTML = "";
-    result.forEach((item) => {
-      const li = document.createElement("li");
-      li.textContent = item;
-      li.setAttribute("role", "option");
-      li.addEventListener("click", () => {
-        barangay.value = item;
-        resultBox.hidden = true;
-      });
-      suggestions.appendChild(li);
-    });
-  }
+  barangay.addEventListener("input", async () => {
+    const list = await getBarangayListCached();
+    const input = barangay.value;
+    if (!input.length) {
+      showSuggestions(list);
+      return;
+    }
+    showSuggestions(filterBarangays(list, input));
+  });
+
+  document.addEventListener("mousedown", (e) => {
+    if (!searchBox.contains(e.target)) {
+      hideSuggestions();
+    }
+  });
 
   for (let i = 0; i < 24; i++) {
     const option = document.createElement("option");
