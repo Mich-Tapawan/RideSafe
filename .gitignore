@@ -1,6 +1,7 @@
 venv/
 .venv/
-traffic-incident.xlsx
-~$*.xlsx
-~*
 .env
+__pycache__/
+*.pyc
+summary_report.pdf
+~$*.xlsx

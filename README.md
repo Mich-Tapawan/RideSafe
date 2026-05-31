@@ -44,7 +44,7 @@ RideSafe is a traffic safety platform that uses historical incident data (2022�
 ### Prerequisites
 
 - **Python 3.8+**
-- **traffic-incident.xlsx** in the project root (gitignored; required for charts and predictions)
+- **traffic-incident.xlsx** in the project root (required for charts and predictions; must be committed for Render)
 - **wkhtmltopdf** (required for PDF generation)
   - Windows: Download from [wkhtmltopdf.org](https://wkhtmltopdf.org/downloads.html)
   - macOS: `brew install wkhtmltopdf`
@@ -101,7 +101,9 @@ The app serves a dashboard with embedded Plotly/Folium visualizations. Predictio
 ```
 imusaccident/
 ├── app.py                        # Flask application & routes
-├── traffic-incident.xlsx         # Source traffic data (2022–2024, not in git)
+├── traffic-incident.xlsx         # Source traffic data (2022–2024)
+├── Dockerfile                  # Render / Docker production image
+├── render.yaml                 # Render Blueprint spec
 ├── requirements.txt
 ├── Procfile                      # Heroku deployment config
 │
@@ -145,6 +147,42 @@ The prediction model uses:
 
 ## Deployment
 
+### Deploy to Render (Docker — recommended)
+
+This app uses **Docker** on Render so `wkhtmltopdf`, GeoPandas, and the ML stack work in production.
+
+**Before you deploy**, ensure these are committed to git:
+
+- `traffic-incident.xlsx` (project root)
+- `scripts/accident_prediction_model.pkl`
+- `scripts/barangay_encoder.pkl`
+- `static/assets/Imus.geojson`
+
+**Option A — Blueprint (`render.yaml`)**
+
+1. Push the repo to GitHub.
+2. In [Render Dashboard](https://dashboard.render.com) → **New** → **Blueprint** → connect the repo.
+3. Render reads [`render.yaml`](render.yaml) and creates the web service.
+4. Wait for the Docker build (first build may take several minutes).
+
+**Option B — Manual Web Service**
+
+1. **New** → **Web Service** → connect GitHub repo.
+2. **Environment:** Docker  
+3. **Dockerfile path:** `./Dockerfile`  
+4. **Instance type:** Free (or paid for always-on / faster builds).  
+5. Environment variables (usually set by the Dockerfile; override if needed):
+   - `WKHTMLTOPDF_PATH` = `/usr/bin/wkhtmltopdf`
+6. Deploy.
+
+The container runs:
+
+`gunicorn --bind 0.0.0.0:$PORT --workers 2 --timeout 120 app:app`
+
+**After deploy:** open your `*.onrender.com` URL. Run a prediction, then test **Download summary report (PDF)**.
+
+**Free tier notes:** The service sleeps after inactivity; the first request after sleep can take 30–90 seconds while the model and charts load.
+
 ### Deploy to Heroku
 
 ```bash
@@ -154,7 +192,7 @@ git push heroku main
 heroku logs --tail
 ```
 
-The `Procfile` is configured for Heroku deployment.
+The [`Procfile`](Procfile) binds to `$PORT` for compatibility with Heroku and similar hosts.
 
 ## License
 

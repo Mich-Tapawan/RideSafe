@@ -1,0 +1,15 @@
+venv/
+.venv/
+.env
+.git/
+.gitignore
+__pycache__/
+**/__pycache__/
+*.pyc
+*.pyo
+.cursor/
+*.md
+!README.md
+terminals/
+summary_report.pdf
+~$*.xlsx

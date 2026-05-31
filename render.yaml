@@ -1,0 +1,14 @@
+# Render Blueprint: https://render.com/docs/blueprint-spec
+services:
+  - type: web
+    name: ridesafe
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /
+    envVars:
+      - key: WKHTMLTOPDF_PATH
+        value: /usr/bin/wkhtmltopdf
+      - key: PYTHONUNBUFFERED
+        value: "1"
