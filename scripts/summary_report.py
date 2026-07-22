@@ -6,13 +6,8 @@ import matplotlib
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-import pandas as pd
 
-INCIDENT_SHEETS = [
-    "Jan 1 - Dec 31, 2022",
-    "Jan 1 - Dec 31, 2023",
-    "Jan 1 - Nov 18, 2024",
-]
+from scripts.repository import get_incidents_df
 
 QUARTER_LABELS = ["Jan-Mar", "Apr-Jun", "Jul-Sep", "Oct-Dec"]
 
@@ -25,29 +20,16 @@ def risk_label(percent):
     return "High"
 
 
-def load_incident_data(file_path):
-    frames = [pd.read_excel(file_path, sheet_name=name) for name in INCIDENT_SHEETS]
-    df = pd.concat(frames, ignore_index=True)
-    df["dateCommitted"] = pd.to_datetime(df["dateCommitted"], errors="coerce")
-    df["hour"] = pd.to_datetime(df["timeCommitted"], format="%H:%M:%S", errors="coerce").dt.hour
-    df["month"] = df["dateCommitted"].dt.month
-    df["year"] = df["dateCommitted"].dt.year
-    return df.dropna(subset=["barangay"])
-
-
 def _quarter_stats(df_barangay):
     if df_barangay.empty:
         return {}, None, None
 
     working = df_barangay.copy()
-    working["quarter"] = pd.cut(
-        working["month"],
-        bins=[0, 3, 6, 9, 12],
-        labels=QUARTER_LABELS,
-        include_lowest=True,
+    working["quarter"] = working["month"].apply(
+        lambda m: QUARTER_LABELS[(m - 1) // 3] if m else None
     )
-    quarter_counts = (
-        working.groupby("quarter", observed=False).size().reindex(QUARTER_LABELS, fill_value=0)
+    quarter_counts = working.groupby("quarter", observed=False).size().reindex(
+        QUARTER_LABELS, fill_value=0
     )
     total = int(quarter_counts.sum())
     quarter_breakdown = [
@@ -79,6 +61,8 @@ def _top_hours(predictions, n=3, highest=True):
 
 
 def _city_avg_at_hour(accident_model, hour):
+    if accident_model.city_hour_averages:
+        return accident_model.city_hour_averages.get(hour, 0)
     values = [
         accident_model._predict_probability_value(barangay, hour)
         for barangay in accident_model.barangays
@@ -115,7 +99,7 @@ def _build_chart(predictions, peak_hour, lowest_hour, selected_hour):
     return base64.b64encode(buffer.read()).decode("ascii")
 
 
-def generate_summary_report(file_path, barangay, accident_model, selected_hour=None):
+def generate_summary_report(barangay, accident_model, selected_hour=None):
     barangay = barangay.strip().upper()
     if barangay not in accident_model.barangays:
         raise ValueError(f"Invalid barangay: {barangay}")
@@ -125,7 +109,7 @@ def generate_summary_report(file_path, barangay, accident_model, selected_hour=N
         if selected_hour < 0 or selected_hour > 23:
             raise ValueError("Hour must be between 0 and 23")
 
-    df = load_incident_data(file_path)
+    df = get_incidents_df()
     df_barangay = df[df["barangay"] == barangay]
     total_incidents = len(df_barangay)
     city_total = len(df)

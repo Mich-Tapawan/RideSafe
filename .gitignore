@@ -5,3 +5,5 @@ __pycache__/
 *.pyc
 summary_report.pdf
 ~$*.xlsx
+.data/
+.cursor/

@@ -1,0 +1,32 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ridesafe
+      POSTGRES_PASSWORD: ridesafe
+      POSTGRES_DB: ridesafe
+    ports:
+      - "5432:5432"
+    volumes:
+      - ridesafe_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ridesafe"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  web:
+    build: .
+    ports:
+      - "10000:10000"
+    environment:
+      PORT: "10000"
+      DATABASE_URL: postgresql://ridesafe:ridesafe@db:5432/ridesafe
+      WKHTMLTOPDF_PATH: /usr/bin/wkhtmltopdf
+      WEB_CONCURRENCY: "1"
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  ridesafe_pgdata:

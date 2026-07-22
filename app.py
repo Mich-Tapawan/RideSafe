@@ -1,99 +1,135 @@
 from flask import Flask, render_template, request, jsonify, send_file
 from flask_cors import CORS
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from datetime import datetime
 import pdfkit
 import shutil
 import re
-from io import BytesIO
-from scripts.bar_graph import generate_bar_graph
-from scripts.heat_map import generate_heat_map
-from scripts.chart import generate_chart
-from scripts.month_data import generate_month_list
-from scripts.barangay_list import generate_barangay_list
-from scripts.model import AccidentModel
-from scripts.summary_report import generate_summary_report
 import logging
 import os
+from io import BytesIO
+
+from scripts.month_data import generate_month_list
+from scripts.model import AccidentModel
+from scripts.summary_report import generate_summary_report
+from scripts.db import init_db
+from scripts.seed_database import seed_database
+from scripts.cache import warm_dashboard_cache, get_dashboard_html, get_barangay_list_cached
+
+_log_level = os.environ.get("LOG_LEVEL", "INFO").upper()
+logging.basicConfig(
+    level=getattr(logging, _log_level, logging.INFO),
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+)
 
 app = Flask(__name__)
 CORS(app)
 
-EXCEL_FILE_PATH = 'traffic-incident.xlsx'
+limiter = Limiter(
+    get_remote_address,
+    app=app,
+    default_limits=[],
+    storage_uri="memory://",
+)
 
-#Loads model upon starting the webapp
 accident_model = AccidentModel()
-accident_model.load_model()
 
-@app.route('/')
+
+def _initialize_app():
+    init_db()
+    seed_database()
+    accident_model.load_model()
+    accident_model.precompute_city_hour_averages()
+    warm_dashboard_cache()
+    logging.info("RideSafe startup complete.")
+
+
+_initialize_app()
+
+
+@app.route("/health")
+def health():
+    return jsonify({"status": "ok"})
+
+
+@app.route("/")
+@limiter.limit("30 per minute")
 def home():
-    bar_graph_html = generate_bar_graph(EXCEL_FILE_PATH)
-    heat_map_html = generate_heat_map(EXCEL_FILE_PATH)
-    chart_2022_html = generate_chart(EXCEL_FILE_PATH, 2022)
-    chart_2023_html = generate_chart(EXCEL_FILE_PATH, 2023)
-    chart_2024_html = generate_chart(EXCEL_FILE_PATH, 2024)
+    cache = get_dashboard_html()
+    return render_template(
+        "index.html",
+        bar_graph=cache["bar_graph"],
+        chart_2022=cache["chart_2022"],
+        chart_2023=cache["chart_2023"],
+        chart_2024=cache["chart_2024"],
+        heat_map=cache["heat_map"],
+    )
 
-    return render_template('index.html', bar_graph = bar_graph_html, chart_2022 = chart_2022_html, chart_2023 = chart_2023_html, chart_2024 = chart_2024_html, heat_map = heat_map_html)
 
-@app.route('/getMonthData', methods=['POST'])
+@app.route("/getMonthData", methods=["POST"])
 def get_month_data():
     try:
         data = request.get_json()
-        logging.debug(f'Received data:{data}')
-        if not data or 'year' not in data or 'month' not in data:
+        logging.debug("Received data: %s", data)
+        if not data or "year" not in data or "month" not in data:
             raise ValueError("Invalid input data. Ensure 'year' and 'month' are provided.")
-        
-        year = data.get('year')
-        month_name = data.get('month')
-        month = datetime.strptime(month_name, "%b").month 
-        logging.debug(f"Year: {year}, Month: {month_name}")
 
+        year = data.get("year")
+        month_name = data.get("month")
+        month = datetime.strptime(month_name, "%b").month
+        logging.debug("Year: %s, Month: %s", year, month_name)
 
-        response = generate_month_list(EXCEL_FILE_PATH, year, month)
-        logging.debug(f"Response from generate_month_list: {response}")
+        response = generate_month_list(year, month)
+        logging.debug("Response from generate_month_list: %s", response)
 
         return jsonify(response)
-    
+
     except Exception as e:
-        logging.error(f"Error in get_month_data: {str(e)}")
-        return jsonify({'error':str(e)}), 500
+        logging.error("Error in get_month_data: %s", e)
+        return jsonify({"error": str(e)}), 500
 
 
-@app.route('/predict', methods=['POST'])
+@app.route("/predict", methods=["POST"])
 def predict_accident():
     try:
         data = request.get_json()
-        barangay = data.get('barangay')
-        hour = data.get('hour')
-        
-        # Check if both barangay and hour are provided
+        barangay = data.get("barangay")
+        hour = data.get("hour")
+
         if barangay is None or hour is None:
-            return jsonify({'error': 'Please provide barangay and hour.'}), 400
-        
-        # Extract the hour part from the "hh:mm" format
+            return jsonify({"error": "Please provide barangay and hour."}), 400
+
         try:
             hour = int(hour.split(":")[0])
         except ValueError:
-            return jsonify({'error': 'Invalid hour format. Must be in "hh:mm" format.'}), 400
+            return jsonify({"error": 'Invalid hour format. Must be in "hh:mm" format.'}), 400
         except IndexError:
-            return jsonify({'error': 'Hour format is incorrect. Please provide hour in "hh:mm" format.'}), 400
-        
-        # Ensure the hour is valid (between 0 and 23)
+            return jsonify(
+                {"error": 'Hour format is incorrect. Please provide hour in "hh:mm" format.'}
+            ), 400
+
         if hour < 0 or hour > 23:
-            return jsonify({'error': 'Hour must be between 00 and 23.'}), 400
-        
+            return jsonify({"error": "Hour must be between 00 and 23."}), 400
+
         response = accident_model.predict_accident_chance(barangay, hour)
         return jsonify(response)
-    
-    except Exception as e:
-        return jsonify({'error': f'No results found: {str(e)}'}), 500
+
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    except Exception:
+        logging.exception("Error in predict_accident")
+        return jsonify({"error": "Unable to generate prediction."}), 500
 
 
-@app.route('/getBarangayList', methods=['GET'])
+@app.route("/getBarangayList", methods=["GET"])
 def get_barangay_list():
     try:
-        return generate_barangay_list(EXCEL_FILE_PATH)
-    except Exception as e:
-        return jsonify('Unable to generate list', e), 500
+        return jsonify(get_barangay_list_cached())
+    except Exception:
+        logging.exception("Error in get_barangay_list")
+        return jsonify({"error": "Unable to generate barangay list."}), 500
+
 
 def _wkhtmltopdf_config():
     path = os.environ.get("WKHTMLTOPDF_PATH")
@@ -110,7 +146,8 @@ def _wkhtmltopdf_config():
     )
 
 
-@app.route('/getSummaryReport/<string:barangay>', methods=['GET'])
+@app.route("/getSummaryReport/<string:barangay>", methods=["GET"])
+@limiter.limit("10 per minute")
 def get_summary_report(barangay):
     try:
         selected_hour = request.args.get("hour")
@@ -121,7 +158,6 @@ def get_summary_report(barangay):
                 return jsonify({"error": "Invalid hour query parameter."}), 400
 
         report = generate_summary_report(
-            EXCEL_FILE_PATH,
             barangay,
             accident_model,
             selected_hour=selected_hour,
@@ -161,8 +197,13 @@ def get_summary_report(barangay):
     except FileNotFoundError as e:
         return jsonify({"error": str(e)}), 500
     except Exception as e:
-        logging.error(f"Error in get_summary_report: {e}")
+        logging.error("Error in get_summary_report: %s", e)
         return jsonify({"error": "Unable to generate summary report."}), 500
 
+
 if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 5000)), debug=True)
+    app.run(
+        host="0.0.0.0",
+        port=int(os.environ.get("PORT", 5000)),
+        debug=os.environ.get("FLASK_DEBUG") == "1",
+    )

@@ -11,18 +11,19 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libproj-dev \
     gcc \
     g++ \
+    fonts-dejavu-core \
     && rm -rf /var/lib/apt/lists/*
 
 ENV WKHTMLTOPDF_PATH=/usr/bin/wkhtmltopdf
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
+ENV WEB_CONCURRENCY=1
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-# Render sets PORT at runtime (default 10000)
 EXPOSE 10000
 
-CMD ["sh", "-c", "gunicorn --bind 0.0.0.0:${PORT:-10000} --workers 2 --timeout 120 --access-logfile - app:app"]
+CMD ["sh", "-c", "python -m scripts.seed_database && gunicorn --bind 0.0.0.0:${PORT:-10000} --workers ${WEB_CONCURRENCY:-1} --timeout 120 --access-logfile - app:app"]

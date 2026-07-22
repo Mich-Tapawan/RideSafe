@@ -13,3 +13,4 @@ __pycache__/
 terminals/
 summary_report.pdf
 ~$*.xlsx
+.data/

@@ -6,13 +6,13 @@ from sklearn.utils.class_weight import compute_class_weight
 from imblearn.over_sampling import SMOTE
 from sklearn.model_selection import train_test_split
 import joblib
-from collections import defaultdict
 
 class AccidentModel:
     def __init__(self):
         self.model = None
         self.encoder = None
         self.barangays = None
+        self.city_hour_averages = {}
 
     def train_and_save_model(self):
         try:
@@ -105,5 +105,20 @@ class AccidentModel:
     def predict_all_hours(self, barangay):
         return {
             str(hour).zfill(2): self._predict_probability_value(barangay, hour)
+            for hour in range(24)
+        }
+
+    def precompute_city_hour_averages(self):
+        if self.model is None or self.barangays is None:
+            return
+        self.city_hour_averages = {
+            hour: round(
+                sum(
+                    self._predict_probability_value(barangay, hour)
+                    for barangay in self.barangays
+                )
+                / len(self.barangays),
+                2,
+            )
             for hour in range(24)
         }

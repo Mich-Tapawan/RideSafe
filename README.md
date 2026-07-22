@@ -31,10 +31,12 @@ RideSafe is a traffic safety platform that uses historical incident data (2022�
 - **Interactive dashboards**: Dynamic bar graphs, heatmaps, and time-series charts built with Plotly and Folium
 - **PDF reports**: Multi-section barangay summary (KPIs, hourly chart, historical breakdown, ML recommendations) — run a prediction first, then download
 - **Geospatial analysis**: Accident density mapping using GeoJSON data of Imus barangays
+- **Production-ready**: Postgres-backed data layer, startup caching, health checks, and rate limiting
 
 ## Tech Stack
 
-- **Backend**: Flask (Python 3.8+)
+- **Backend**: Flask (Python 3.12+)
+- **Database**: PostgreSQL (production) / SQLite (local fallback)
 - **Machine learning**: Scikit-learn (Random Forest + SMOTE)
 - **Frontend**: HTML5, CSS3, JavaScript, Plotly.js
 - **Mapping**: Folium, GeoPandas
@@ -44,98 +46,137 @@ RideSafe is a traffic safety platform that uses historical incident data (2022�
 
 ### Prerequisites
 
-- **Python 3.8+**
-- **traffic-incident.xlsx** in the project root (required for charts and predictions; must be committed for Render)
-- **wkhtmltopdf** (required for PDF generation)
+- **Python 3.12+**
+- **traffic-incident.xlsx** in the project root (used once to seed the database)
+- **wkhtmltopdf** (required for PDF generation locally; included in Docker image)
   - Windows: Download from [wkhtmltopdf.org](https://wkhtmltopdf.org/downloads.html)
   - macOS: `brew install wkhtmltopdf`
   - Linux: `apt-get install wkhtmltopdf`
-  - Optional: set `WKHTMLTOPDF_PATH` in the environment if the binary is not on PATH
+  - Optional: set `WKHTMLTOPDF_PATH` if the binary is not on PATH
 
-### Installation
+### Local development (SQLite)
 
-1. **Clone the repository**
+1. **Clone and install**
 
    ```bash
    git clone https://github.com/Mich-Tapawan/RideSafe.git
-   cd ridesafe
-   ```
-
-2. **Create a virtual environment** (recommended)
-
-   ```bash
-   # Windows
+   cd RideSafe
    python -m venv venv
-   venv\Scripts\activate
-
-   # macOS/Linux
-   python3 -m venv venv
-   source venv/bin/activate
-   ```
-
-3. **Install dependencies**
-
-   ```bash
+   venv\Scripts\activate   # Windows
    pip install -r requirements.txt
    ```
 
-4. **Place your data file**
+2. **Place** `traffic-incident.xlsx` in the project root.
 
-   Add `traffic-incident.xlsx` to the project root (same folder as `app.py`).
+3. **Seed the database** (creates `.data/ridesafe.db` if `DATABASE_URL` is not set)
 
-### Running the Application
+   ```bash
+   python -m scripts.seed_database
+   ```
 
-1. **Start the Flask development server**
+4. **Run the app**
 
    ```bash
    python app.py
    ```
 
-2. **Open** `http://localhost:5000`
+5. **Open** `http://localhost:5000`
+
+### Local development (Docker + Postgres)
+
+```bash
+docker compose up --build
+```
+
+Open `http://localhost:10000`. The web container seeds the database automatically on first start.
+
+### Production (Render)
+
+Deploy with the included [`render.yaml`](render.yaml) Blueprint. It provisions:
+
+- A **PostgreSQL** database (`ridesafe-db`)
+- A **Docker web service** with `DATABASE_URL` linked automatically
+- Health checks on `/health`
+
+The Docker entrypoint runs `python -m scripts.seed_database` before Gunicorn (idempotent — skips if data exists).
+
+## Environment variables
+
+| Variable | Description | Default |
+| -------- | ----------- | ------- |
+| `DATABASE_URL` | Postgres connection string | SQLite at `.data/ridesafe.db` |
+| `WKHTMLTOPDF_PATH` | Path to wkhtmltopdf binary | Auto-detected |
+| `WEB_CONCURRENCY` | Gunicorn worker count | `1` |
+| `LOG_LEVEL` | Python log level | `INFO` |
+| `FLASK_DEBUG` | Enable Flask debug mode (`1` to enable) | off |
+| `EXCEL_FILE_PATH` | Path to xlsx for seeding | `traffic-incident.xlsx` |
+
+## Data updates
+
+Runtime reads from the database, not the xlsx file. To refresh data:
+
+1. Update `traffic-incident.xlsx`
+2. Force re-seed:
+
+   ```bash
+   python -m scripts.seed_database --force
+   ```
+
+   On Render, run the same command via the shell or redeploy after clearing the database.
 
 ## Architecture
 
-The app serves a dashboard with embedded Plotly/Folium visualizations. Prediction requests hit the trained `AccidentModel`; summary reports combine analytics with the same model for PDF output.
+On startup the app: initializes the DB → seeds from xlsx (if empty) → loads the ML model → precomputes city-wide hourly averages → warms the dashboard HTML cache.
+
+The homepage and barangay list are served from in-memory cache. API endpoints query Postgres/SQLite. PDF reports combine DB incident history with ML predictions.
 
 ### Project structure
 
 ```
-imusaccident/
+RideSafe/
 ├── app.py                        # Flask application & routes
-├── traffic-incident.xlsx         # Source traffic data (2022–2024)
-├── Dockerfile                  # Render / Docker production image
-├── render.yaml                 # Render Blueprint spec
+├── traffic-incident.xlsx         # Source data for DB seeding
+├── Dockerfile                    # Production image (wkhtmltopdf, GDAL, Gunicorn)
+├── docker-compose.yml            # Local Postgres + web
+├── render.yaml                   # Render Blueprint (web + Postgres)
 ├── requirements.txt
-├── Procfile                      # Heroku deployment config
+├── Procfile
 │
 ├── scripts/
+│   ├── db.py                     # SQLAlchemy models & session
+│   ├── repository.py             # DB query helpers
+│   ├── seed_database.py          # xlsx → DB import
+│   ├── cache.py                  # Dashboard warmup cache
 │   ├── model.py                  # Random Forest prediction model
 │   ├── bar_graph.py              # Plotly trend charts
 │   ├── heat_map.py               # Folium geographic visualization
 │   ├── chart.py                  # Time-series charts
-│   ├── barangay_list.py          # Barangay data processing
+│   ├── barangay_list.py          # Barangay list from DB
 │   ├── month_data.py             # Monthly statistics
-│   └── summary_report.py         # PDF report generation
+│   └── summary_report.py         # PDF report data assembly
 │
 ├── templates/
-│   ├── index.html                # Main dashboard
-│   └── pdf_template.html         # PDF report template
+│   ├── index.html
+│   └── pdf_template.html
 │
 └── static/
-    ├── assets/                   # GeoJSON and data files
-    ├── js/                       # JavaScript files
-    └── style/                    # CSS stylesheets
+    ├── assets/
+    ├── js/
+    └── style/
 ```
 
 ## API Endpoints
 
 | Endpoint                       | Method | Description                                                       |
 | ------------------------------ | ------ | ----------------------------------------------------------------- |
-| `/`                            | GET    | Main dashboard with visualizations                                |
+| `/health`                      | GET    | Health check (`{"status": "ok"}`)                               |
+| `/`                            | GET    | Main dashboard with visualizations (cached)                       |
 | `/getMonthData`                | POST   | Monthly accident statistics (`year`, `month`)                     |
 | `/predict`                     | POST   | ML accident probability (`barangay`, `hour`)                      |
 | `/getBarangayList`             | GET    | List of barangays from incident data                              |
 | `/getSummaryReport/<barangay>` | GET    | PDF summary report (`?hour=8` optional, highlights selected hour) |
+
+Rate limits: `/` — 30/min, `/getSummaryReport` — 10/min.
 
 ## Machine Learning Model
 
@@ -145,6 +186,9 @@ The prediction model uses:
 - **Features**: Barangay, hour of day, peak hour indicator
 - **Data balance**: SMOTE (Synthetic Minority Over-sampling Technique)
 - **Training data**: Traffic incidents from 2022–2024
+- **Artifacts**: `scripts/accident_prediction_model.pkl`, `scripts/barangay_encoder.pkl`
+
+Retrain offline with `AccidentModel.train_and_save_model()` and redeploy the pickle files.
 
 ## License
 
