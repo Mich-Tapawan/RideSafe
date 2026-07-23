@@ -100,6 +100,18 @@ Deploy with the included [`render.yaml`](render.yaml) Blueprint. It provisions:
 
 The Docker entrypoint runs `python -m scripts.seed_database` before Gunicorn (idempotent — skips if data exists).
 
+### Keeping the free tier awake
+
+Render’s free web service sleeps after ~15 minutes of idle traffic. To reduce cold starts:
+
+1. **GitHub Actions (included)** — [`.github/workflows/keep-alive.yml`](.github/workflows/keep-alive.yml) pings `/health` every 10 minutes.
+   - After deploy, set a repository **variable** (or secret): `RENDER_URL` = `https://your-service.onrender.com` (no trailing slash).
+   - Path: GitHub repo → **Settings** → **Secrets and variables** → **Actions** → **Variables** → New variable.
+   - You can also run it manually under **Actions** → **Keep Render awake** → **Run workflow**.
+2. **UptimeRobot (optional)** — Create an HTTP monitor on `https://your-service.onrender.com/health` every 5–10 minutes.
+
+Always ping **`/health`**, not `/` (the homepage is expensive to generate).
+
 ## Environment variables
 
 | Variable | Description | Default |

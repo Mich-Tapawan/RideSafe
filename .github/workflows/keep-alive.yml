@@ -1,0 +1,34 @@
+# Pings Render /health so the free-tier web service is less likely to sleep.
+# Setup: Repo Settings → Secrets and variables → Actions → New repository variable
+#   Name: RENDER_URL
+#   Value: https://your-service.onrender.com  (no trailing slash)
+#
+# Or set the same name as a secret if you prefer not to expose the URL in logs.
+
+name: Keep Render awake
+
+on:
+  schedule:
+    # Every 10 minutes (Render free tier spins down after ~15 min idle)
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping /health
+        env:
+          RENDER_URL_VAR: ${{ vars.RENDER_URL }}
+          RENDER_URL_SECRET: ${{ secrets.RENDER_URL }}
+        run: |
+          RENDER_URL="${RENDER_URL_VAR:-$RENDER_URL_SECRET}"
+          if [ -z "$RENDER_URL" ]; then
+            echo "Set repository variable or secret RENDER_URL (e.g. https://ridesafe-xxxx.onrender.com)"
+            exit 1
+          fi
+          BASE="${RENDER_URL%/}"
+          echo "Pinging ${BASE}/health"
+          curl -fsS --max-time 90 "${BASE}/health"
+          echo
+          echo "OK"
