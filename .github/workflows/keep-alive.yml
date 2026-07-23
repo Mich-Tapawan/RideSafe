@@ -29,6 +29,6 @@ jobs:
           fi
           BASE="${RENDER_URL%/}"
           echo "Pinging ${BASE}/health"
-          curl -fsS --max-time 90 "${BASE}/health"
+          curl -fsS --max-time 180 "${BASE}/health"
           echo
           echo "OK"
