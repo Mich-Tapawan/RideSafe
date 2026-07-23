@@ -139,6 +139,8 @@ Always ping **`/health`**, not `/` (the homepage is expensive to generate).
 | -------- | ----------- | ------- |
 | `DATABASE_URL` | Postgres connection string | SQLite at `.data/ridesafe.db` |
 | `GOOGLE_API_KEY` | Gemini API key for embeddings + chat | unset (chat unavailable) |
+| `SECRET_KEY` | Flask session secret (admin chat mode) | dev default in code |
+| `CHAT_ADMIN_PASSWORD` | Ask RideSafe admin unlock password | `RideSafe2026!` |
 | `GEMINI_EMBED_MODEL` | Embedding model name | `gemini-embedding-001` |
 | `GEMINI_CHAT_MODEL` | Chat model name | `gemini-flash-latest` |
 | `GEMINI_CHAT_FALLBACKS` | Comma-separated fallbacks on 429/503 | `gemini-flash-lite-latest,gemini-3.5-flash-lite,gemini-3.1-flash-lite` |
@@ -221,13 +223,16 @@ RideSafe/
 | `/health`                      | GET    | Health check (`{"status": "ok"}`)                               |
 | `/`                            | GET    | Main dashboard with visualizations (cached)                       |
 | `/chat`                        | GET    | Ask RideSafe chatbot page                                         |
-| `/api/chat`                    | POST   | RAG answer (`{"message": "..."}` → `answer`, `sources`)         |
+| `/api/chat`                    | POST   | RAG + live tools (`message`); guest limit 3/hour; admin unlimited |
+| `/api/chat/status`             | GET    | `{ admin, user_limit }` session status                            |
+| `/api/chat/admin/login`        | POST   | Unlock admin (`password`)                                         |
+| `/api/chat/admin/logout`       | POST   | Exit admin mode                                                   |
 | `/getMonthData`                | POST   | Monthly accident statistics (`year`, `month`)                     |
 | `/predict`                     | POST   | ML accident probability (`barangay`, `hour`)                      |
 | `/getBarangayList`             | GET    | List of barangays from incident data                              |
 | `/getSummaryReport/<barangay>` | GET    | PDF summary report (`?hour=8` optional, highlights selected hour) |
 
-Rate limits: `/` — 30/min, `/getSummaryReport` and `/api/chat` — 10/min.
+Rate limits: `/` — 30/min; `/getSummaryReport` — 10/min; `/api/chat` — **3/hour** for guests, effectively unlimited for admin session.
 
 ## Machine Learning Model
 

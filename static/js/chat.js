@@ -8,8 +8,16 @@ document.addEventListener("DOMContentLoaded", () => {
   const sendBtn = document.getElementById("chat-send");
   const messages = document.getElementById("chat-messages");
   const status = document.getElementById("chat-status");
+  const quotaEl = document.getElementById("chat-quota");
+  const adminBtn = document.getElementById("admin-mode-btn");
+  const modal = document.getElementById("admin-modal");
+  const adminForm = document.getElementById("admin-login-form");
+  const adminPassword = document.getElementById("admin-password");
+  const adminError = document.getElementById("admin-login-error");
+  const adminLogoutBtn = document.getElementById("admin-logout-btn");
 
   let history = loadHistory();
+  let isAdmin = false;
 
   function loadHistory() {
     try {
@@ -43,6 +51,61 @@ document.addEventListener("DOMContentLoaded", () => {
     status.hidden = false;
     status.textContent = text;
     status.classList.toggle("chat-status--error", Boolean(isError));
+  }
+
+  function updateQuotaUi() {
+    if (!quotaEl || !adminBtn) {
+      return;
+    }
+    if (isAdmin) {
+      quotaEl.textContent = "Admin · unlimited questions";
+      quotaEl.classList.add("chat-quota--admin");
+      adminBtn.textContent = "Admin ✓";
+      adminBtn.classList.add("nav-link--active");
+      if (adminLogoutBtn) {
+        adminLogoutBtn.hidden = false;
+      }
+    } else {
+      quotaEl.textContent = "Guest · 3 questions / hour";
+      quotaEl.classList.remove("chat-quota--admin");
+      adminBtn.textContent = "Admin";
+      adminBtn.classList.remove("nav-link--active");
+      if (adminLogoutBtn) {
+        adminLogoutBtn.hidden = true;
+      }
+    }
+  }
+
+  async function refreshStatus() {
+    try {
+      const res = await fetch("/api/chat/status", { credentials: "same-origin" });
+      const data = await res.json().catch(() => ({}));
+      isAdmin = Boolean(data.admin);
+    } catch (_) {
+      isAdmin = false;
+    }
+    updateQuotaUi();
+  }
+
+  function openModal() {
+    if (!modal) {
+      return;
+    }
+    modal.hidden = false;
+    adminError.hidden = true;
+    adminError.textContent = "";
+    if (adminPassword) {
+      adminPassword.value = "";
+      adminPassword.focus();
+    }
+    updateQuotaUi();
+  }
+
+  function closeModal() {
+    if (!modal) {
+      return;
+    }
+    modal.hidden = true;
   }
 
   function escapeHtml(text) {
@@ -115,6 +178,62 @@ document.addEventListener("DOMContentLoaded", () => {
 
   renderHistory();
   saveHistory();
+  refreshStatus();
+
+  if (adminBtn) {
+    adminBtn.addEventListener("click", () => {
+      openModal();
+    });
+  }
+
+  modal?.querySelectorAll("[data-close-modal]").forEach((el) => {
+    el.addEventListener("click", closeModal);
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && modal && !modal.hidden) {
+      closeModal();
+    }
+  });
+
+  adminForm?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    adminError.hidden = true;
+    try {
+      const res = await fetch("/api/chat/admin/login", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: adminPassword.value }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || "Login failed");
+      }
+      isAdmin = true;
+      updateQuotaUi();
+      closeModal();
+      setStatus("Admin mode enabled — unlimited questions.");
+    } catch (err) {
+      adminError.textContent = err.message || "Incorrect password.";
+      adminError.hidden = false;
+    }
+  });
+
+  adminLogoutBtn?.addEventListener("click", async () => {
+    try {
+      await fetch("/api/chat/admin/logout", {
+        method: "POST",
+        credentials: "same-origin",
+      });
+    } catch (_) {
+      /* ignore */
+    }
+    isAdmin = false;
+    updateQuotaUi();
+    closeModal();
+    setStatus("Returned to guest mode (3 questions / hour).");
+  });
 
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -131,10 +250,15 @@ document.addEventListener("DOMContentLoaded", () => {
     try {
       const res = await fetch("/api/chat", {
         method: "POST",
+        credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message }),
       });
       const data = await res.json().catch(() => ({}));
+      if (typeof data.admin === "boolean") {
+        isAdmin = data.admin;
+        updateQuotaUi();
+      }
       if (!res.ok) {
         throw new Error(data.error || res.statusText || "Request failed");
       }

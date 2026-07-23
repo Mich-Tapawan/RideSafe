@@ -1,13 +1,15 @@
-from flask import Flask, render_template, request, jsonify, send_file
+from flask import Flask, render_template, request, jsonify, send_file, session
 from flask_cors import CORS
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
+from flask_limiter.errors import RateLimitExceeded
 from datetime import datetime
 import pdfkit
 import shutil
 import re
 import logging
 import os
+import secrets
 from io import BytesIO
 
 from scripts.month_data import generate_month_list
@@ -26,7 +28,13 @@ logging.basicConfig(
 )
 
 app = Flask(__name__)
-CORS(app)
+app.secret_key = os.environ.get("SECRET_KEY") or "ridesafe-dev-secret-change-in-production"
+app.config["PERMANENT_SESSION_LIFETIME"] = 60 * 60 * 12  # 12 hours for admin session
+# Prefer env override; default matches requested demo admin password.
+CHAT_ADMIN_PASSWORD = os.environ.get("CHAT_ADMIN_PASSWORD", "RideSafe2026!")
+CHAT_USER_LIMIT = "3 per hour"
+
+CORS(app, supports_credentials=True)
 
 limiter = Limiter(
     get_remote_address,
@@ -36,6 +44,34 @@ limiter = Limiter(
 )
 
 accident_model = AccidentModel()
+
+
+def _is_chat_admin() -> bool:
+    return bool(session.get("chat_admin"))
+
+
+def _chat_rate_limit():
+    """Users: 3 questions/hour. Admins (session): effectively unlimited."""
+    if _is_chat_admin():
+        return "1000 per hour"
+    return CHAT_USER_LIMIT
+
+
+@app.errorhandler(RateLimitExceeded)
+def _ratelimit_handler(exc):
+    return (
+        jsonify(
+            {
+                "error": (
+                    "Chat limit reached: 3 questions per hour for guest users. "
+                    "Sign in as admin on the Ask RideSafe page for unlimited questions."
+                ),
+                "limit": CHAT_USER_LIMIT,
+                "admin": False,
+            }
+        ),
+        429,
+    )
 
 
 def _initialize_app():
@@ -157,13 +193,45 @@ def chat_page():
     return render_template("chat.html")
 
 
-@app.route("/api/chat", methods=["POST"])
+@app.route("/api/chat/status", methods=["GET"])
+def api_chat_status():
+    return jsonify(
+        {
+            "admin": _is_chat_admin(),
+            "user_limit": CHAT_USER_LIMIT,
+        }
+    )
+
+
+@app.route("/api/chat/admin/login", methods=["POST"])
 @limiter.limit("10 per minute")
+def api_chat_admin_login():
+    data = request.get_json(silent=True) or {}
+    password = data.get("password", "")
+    if not isinstance(password, str):
+        password = ""
+    expected = CHAT_ADMIN_PASSWORD
+    if secrets.compare_digest(password, expected):
+        session["chat_admin"] = True
+        session.permanent = True
+        return jsonify({"ok": True, "admin": True})
+    return jsonify({"ok": False, "error": "Incorrect password."}), 401
+
+
+@app.route("/api/chat/admin/logout", methods=["POST"])
+def api_chat_admin_logout():
+    session.pop("chat_admin", None)
+    return jsonify({"ok": True, "admin": False})
+
+
+@app.route("/api/chat", methods=["POST"])
+@limiter.limit(_chat_rate_limit)
 def api_chat():
     try:
         data = request.get_json(silent=True) or {}
         message = data.get("message", "")
         result = answer_question(message)
+        result["admin"] = _is_chat_admin()
         return jsonify(result)
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
