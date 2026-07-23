@@ -1,9 +1,16 @@
-"""Gemini embeddings + RAG retrieval/answer helpers."""
+"""Gemini embeddings + RAG retrieval/answer helpers (with allowlisted live tools)."""
 
 import logging
 import os
 import re
+import time
 
+from scripts.chat_tools import (
+    begin_tool_trace,
+    format_tool_context,
+    get_tool_trace,
+    select_and_run_tools,
+)
 from scripts.db import (
     EMBEDDING_DIM,
     RagChunk,
@@ -15,10 +22,8 @@ from scripts.db import (
 
 logger = logging.getLogger(__name__)
 
-# Prefer stable aliases; gemini-2.0-flash often has free-tier quota 0 for new keys.
 EMBED_MODEL = os.environ.get("GEMINI_EMBED_MODEL", "gemini-embedding-001")
 CHAT_MODEL = os.environ.get("GEMINI_CHAT_MODEL", "gemini-flash-latest")
-# Tried in order when the primary model is overloaded (503) or rate-limited (429).
 CHAT_FALLBACK_MODELS = [
     m.strip()
     for m in os.environ.get(
@@ -108,9 +113,7 @@ def search_chunks(query: str, k: int = 8) -> list[dict]:
     session = get_session()
     try:
         if rag_chunk_count(session) == 0:
-            raise RagUnavailable(
-                "RAG corpus is empty. Run: python -m scripts.build_rag_corpus"
-            )
+            return []
         query_vec = embed_texts([query])[0]
         rows = (
             session.query(RagChunk, RagDocument)
@@ -143,14 +146,13 @@ def _chat_models() -> list[str]:
 
 def _generate_answer(prompt: str) -> str:
     """Call Gemini with retries and model fallbacks for transient 429/503."""
-    import time
-
     from google.genai import types
     from google.genai.errors import APIError, ClientError, ServerError
 
     client = _client()
     config = types.GenerateContentConfig(
         automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
+        temperature=0.2,
     )
     last_error: Exception | None = None
 
@@ -197,16 +199,18 @@ def answer_question(message: str) -> dict:
     if len(message) > 1000:
         raise ValueError("Message must be at most 1000 characters.")
 
-    hits = search_chunks(message, k=8)
-    if not hits:
-        return {
-            "answer": "I could not find relevant RideSafe data for that question.",
-            "sources": [],
-        }
+    if not is_postgres():
+        raise RagUnavailable(
+            "The chatbot requires PostgreSQL with pgvector. Use Docker Compose or Render."
+        )
 
-    context_blocks = []
+    begin_tool_trace()
+    hits = search_chunks(message, k=8)
+    tool_results = select_and_run_tools(message)
+
     sources = []
     seen = set()
+    context_blocks = []
     for i, hit in enumerate(hits, start=1):
         label = hit["title"]
         if hit.get("barangay"):
@@ -223,16 +227,38 @@ def answer_question(message: str) -> dict:
                 }
             )
 
+    live_block = format_tool_context(tool_results)
+    if live_block:
+        context_blocks.append("Live allowlisted tool results (prefer for numbers):\n" + live_block)
+
+    for call in get_tool_trace():
+        title = f"Live tool: {call['name']}"
+        key = (title, None)
+        if key not in seen:
+            seen.add(key)
+            sources.append(
+                {
+                    "title": title,
+                    "barangay": None,
+                    "source_type": "tool",
+                    "detail": call.get("summary"),
+                }
+            )
+
+    if not context_blocks:
+        return {
+            "answer": "I could not find relevant RideSafe data for that question.",
+            "sources": [],
+        }
+
     context = "\n\n".join(context_blocks)
     system = (
         "You are RideSafe Assistant for Imus City traffic accident data (2022–Nov 2024). "
-        "Answer ONLY using the provided context. If the context is insufficient, say you do not know. "
-        "Do not invent numbers. Be concise and clear for stakeholders. "
-        "When relevant, mention barangay names and hours from the context. "
-        "If the user asks for highest/lowest, safest, most/least accidents, or rankings, "
-        "prefer city ranking documents (titles like Highest-incident, Lowest-incident, "
-        "Highest peak predicted risk, Lowest peak predicted risk) over a single barangay insight. "
-        "Distinguish historical incident counts from predicted risk percentages when both appear."
+        "Answer using the RAG context and any Live allowlisted tool results. "
+        "Prefer live tool results for rankings, counts, monthly totals, and hour-specific risk. "
+        "Prefer RAG for how-to / FAQ / narrative insights. "
+        "Do not invent numbers. Be concise. Distinguish historical incident counts from "
+        "predicted risk percentages."
     )
     prompt = f"{system}\n\nContext:\n{context}\n\nUser question: {message}\n\nAnswer:"
     answer = _generate_answer(prompt)

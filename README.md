@@ -32,7 +32,7 @@ RideSafe is a traffic safety platform that uses historical incident data (2022�
 - **Interactive dashboards**: Dynamic bar graphs, heatmaps, and time-series charts built with Plotly and Folium
 - **PDF reports**: Multi-section barangay summary (KPIs, hourly chart, historical breakdown, ML recommendations) — run a prediction first, then download
 - **Geospatial analysis**: Accident density mapping using GeoJSON data of Imus barangays
-- **Ask RideSafe**: RAG chatbot (`/chat`) — insight text from analytics tables, Gemini embeddings + answers, stored in Postgres with pgvector
+- **Ask RideSafe**: RAG chatbot (`/chat`) with Gemini + pgvector retrieval, plus allowlisted live DB/ML tools for rankings and predictions
 - **Production-ready**: Postgres-backed data layer, startup caching, health checks, and rate limiting
 
 ## Tech Stack
@@ -173,7 +173,7 @@ Runtime reads from the database, not the xlsx file. To refresh data:
 
 On startup the app: initializes the DB (incl. `CREATE EXTENSION vector` on Postgres) → seeds from xlsx (if empty) → builds RAG corpus if empty → loads the ML model → precomputes city-wide hourly averages → warms the dashboard HTML cache.
 
-The homepage and barangay list are served from in-memory cache. API endpoints query Postgres/SQLite. PDF reports combine DB incident history with ML predictions. Chat retrieves embedded insight chunks via pgvector cosine search, then answers with Gemini.
+The homepage and barangay list are served from in-memory cache. API endpoints query Postgres/SQLite. PDF reports combine DB incident history with ML predictions. Chat retrieves embedded insight chunks via pgvector cosine search and may call allowlisted tools (incident rankings, offense breakdowns, monthly totals, barangay summaries, ML hour risk) — never free-form SQL — then answers with Gemini.
 
 ### Project structure
 
@@ -192,7 +192,8 @@ RideSafe/
 │   ├── repository.py             # DB query helpers
 │   ├── seed_database.py          # xlsx → DB import
 │   ├── build_rag_corpus.py       # Insight docs + Gemini embeddings → pgvector
-│   ├── rag.py                    # Embed, retrieve, answer
+│   ├── rag.py                    # Embed, retrieve, answer (+ tool calling)
+│   ├── chat_tools.py             # Allowlisted live DB/ML chat tools
 │   ├── cache.py                  # Dashboard warmup cache
 │   ├── model.py                  # Random Forest prediction model
 │   ├── bar_graph.py              # Plotly trend charts
