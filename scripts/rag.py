@@ -15,8 +15,18 @@ from scripts.db import (
 
 logger = logging.getLogger(__name__)
 
-EMBED_MODEL = os.environ.get("GEMINI_EMBED_MODEL", "text-embedding-004")
-CHAT_MODEL = os.environ.get("GEMINI_CHAT_MODEL", "gemini-2.0-flash")
+# Prefer stable aliases; gemini-2.0-flash often has free-tier quota 0 for new keys.
+EMBED_MODEL = os.environ.get("GEMINI_EMBED_MODEL", "gemini-embedding-001")
+CHAT_MODEL = os.environ.get("GEMINI_CHAT_MODEL", "gemini-flash-latest")
+# Tried in order when the primary model is overloaded (503) or rate-limited (429).
+CHAT_FALLBACK_MODELS = [
+    m.strip()
+    for m in os.environ.get(
+        "GEMINI_CHAT_FALLBACKS",
+        "gemini-flash-lite-latest,gemini-3.5-flash-lite,gemini-3.1-flash-lite",
+    ).split(",")
+    if m.strip()
+]
 
 
 class RagUnavailable(Exception):
@@ -52,12 +62,16 @@ def embed_texts(texts: list[str]) -> list[list[float]]:
     """Embed one or more texts with Gemini. Returns 768-dim vectors."""
     if not texts:
         return []
+    from google.genai import types
+
     client = _client()
     vectors: list[list[float]] = []
+    config = types.EmbedContentConfig(output_dimensionality=EMBEDDING_DIM)
     for text_item in texts:
         result = client.models.embed_content(
             model=EMBED_MODEL,
             contents=text_item,
+            config=config,
         )
         batch = _extract_embedding_values(result)
         vec = batch[0]
@@ -86,7 +100,7 @@ def chunk_text(body: str, size: int = 700, overlap: int = 80) -> list[str]:
     return [c for c in chunks if c]
 
 
-def search_chunks(query: str, k: int = 6) -> list[dict]:
+def search_chunks(query: str, k: int = 8) -> list[dict]:
     if not is_postgres():
         raise RagUnavailable(
             "The chatbot requires PostgreSQL with pgvector. Use Docker Compose or Render."
@@ -119,6 +133,63 @@ def search_chunks(query: str, k: int = 6) -> list[dict]:
         session.close()
 
 
+def _chat_models() -> list[str]:
+    models = [CHAT_MODEL]
+    for name in CHAT_FALLBACK_MODELS:
+        if name not in models:
+            models.append(name)
+    return models
+
+
+def _generate_answer(prompt: str) -> str:
+    """Call Gemini with retries and model fallbacks for transient 429/503."""
+    import time
+
+    from google.genai import types
+    from google.genai.errors import APIError, ClientError, ServerError
+
+    client = _client()
+    config = types.GenerateContentConfig(
+        automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
+    )
+    last_error: Exception | None = None
+
+    for model in _chat_models():
+        for attempt in range(3):
+            try:
+                response = client.models.generate_content(
+                    model=model,
+                    contents=prompt,
+                    config=config,
+                )
+                text = getattr(response, "text", None) or str(response)
+                if model != CHAT_MODEL:
+                    logger.info("Answered with fallback model %s", model)
+                return text.strip()
+            except (ClientError, ServerError, APIError) as exc:
+                last_error = exc
+                status = getattr(exc, "code", None) or getattr(exc, "status_code", None)
+                if status in (429, 503) and attempt < 2:
+                    delay = 1.5 * (attempt + 1)
+                    logger.warning(
+                        "Gemini %s on %s (attempt %s); retrying in %.1fs",
+                        status,
+                        model,
+                        attempt + 1,
+                        delay,
+                    )
+                    time.sleep(delay)
+                    continue
+                if status in (429, 503, 404):
+                    logger.warning("Gemini %s on %s; trying next model", status, model)
+                    break
+                raise
+
+    raise RagUnavailable(
+        "Gemini is temporarily overloaded or rate-limited. Please try again in a moment."
+    ) from last_error
+
+
 def answer_question(message: str) -> dict:
     message = (message or "").strip()
     if not message:
@@ -126,7 +197,7 @@ def answer_question(message: str) -> dict:
     if len(message) > 1000:
         raise ValueError("Message must be at most 1000 characters.")
 
-    hits = search_chunks(message, k=6)
+    hits = search_chunks(message, k=8)
     if not hits:
         return {
             "answer": "I could not find relevant RideSafe data for that question.",
@@ -157,11 +228,12 @@ def answer_question(message: str) -> dict:
         "You are RideSafe Assistant for Imus City traffic accident data (2022–Nov 2024). "
         "Answer ONLY using the provided context. If the context is insufficient, say you do not know. "
         "Do not invent numbers. Be concise and clear for stakeholders. "
-        "When relevant, mention barangay names and hours from the context."
+        "When relevant, mention barangay names and hours from the context. "
+        "If the user asks for highest/lowest, safest, most/least accidents, or rankings, "
+        "prefer city ranking documents (titles like Highest-incident, Lowest-incident, "
+        "Highest peak predicted risk, Lowest peak predicted risk) over a single barangay insight. "
+        "Distinguish historical incident counts from predicted risk percentages when both appear."
     )
     prompt = f"{system}\n\nContext:\n{context}\n\nUser question: {message}\n\nAnswer:"
-
-    client = _client()
-    response = client.models.generate_content(model=CHAT_MODEL, contents=prompt)
-    answer = getattr(response, "text", None) or str(response)
-    return {"answer": answer.strip(), "sources": sources}
+    answer = _generate_answer(prompt)
+    return {"answer": answer, "sources": sources}

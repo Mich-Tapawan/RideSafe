@@ -17,9 +17,10 @@ from scripts.rag import RagUnavailable, chunk_text, embed_texts
 from scripts.repository import (
     get_barangay_stats_df,
     get_daily_offense_df,
+    get_month_totals,
     get_offense_stats_df,
 )
-from scripts.summary_report import generate_summary_report
+from scripts.summary_report import generate_summary_report, risk_label
 
 logging.basicConfig(
     level=logging.INFO,
@@ -64,16 +65,36 @@ FAQ_DOCS = [
         ),
     },
     {
+        "title": "Incident count vs predicted risk",
+        "source_type": "faq",
+        "barangay": None,
+        "body_text": (
+            "Incident count is how many historical traffic incidents were recorded for a barangay "
+            "in the 2022–2024 dataset. Predicted risk percentage is the ML model's estimated relative "
+            "chance of an accident for a barangay at a specific hour. Highest-incident barangays are "
+            "not always the same as highest peak predicted risk barangays. Lowest-incident or safest "
+            "barangays by count may still have elevated predicted risk at certain hours. When users ask "
+            "about most accidents, highest volume, or hotspots by history, use incident rankings. "
+            "When they ask about highest or lowest risk, safest hours, or model probability, use "
+            "predicted peak-risk rankings."
+        ),
+    },
+    {
         "title": "Peak hours citywide",
         "source_type": "faq",
         "barangay": None,
         "body_text": (
             "The model treats morning (7–9) and evening (17–19) as peak-hour windows when estimating risk. "
             "Actual peak predicted hours vary by barangay; use Ask RideSafe or a barangay prediction "
-            "to see local peak and lowest risk hours."
+            "to see local peak and lowest risk hours. Citywide average predicted risk by hour is also "
+            "available in the city hour-risk insight document."
         ),
     },
 ]
+
+
+def _format_ranked_lines(rows: list[tuple[str, str]]) -> str:
+    return "\n".join(f"{i}. {label} — {detail}" for i, (label, detail) in enumerate(rows, start=1))
 
 
 def _barangay_insight_text(report: dict) -> str:
@@ -109,15 +130,25 @@ def _city_offense_doc() -> dict:
     else:
         lines = []
         for year in sorted(df["year"].unique()):
-            part = df[df["year"] == year].sort_values("Count of offense", ascending=False)
-            top = part.head(5)
-            desc = "; ".join(
+            part = df[df["year"] == year].sort_values(
+                "Count of offense", ascending=False
+            )
+            top = part.head(10)
+            top_desc = "; ".join(
                 f"{row['Offense Type']}: {int(row['Count of offense'])}"
                 for _, row in top.iterrows()
             )
-            lines.append(f"Year {int(year)} top offenses — {desc}.")
+            bottom = part.tail(5).sort_values("Count of offense", ascending=True)
+            bottom_desc = "; ".join(
+                f"{row['Offense Type']}: {int(row['Count of offense'])}"
+                for _, row in bottom.iterrows()
+            )
+            lines.append(
+                f"Year {int(year)} top offenses (highest counts) — {top_desc}. "
+                f"Year {int(year)} lowest-count offenses among recorded types — {bottom_desc}."
+            )
         body = (
-            "City-wide offense type statistics for Imus traffic incidents. "
+            "City-wide offense type statistics for Imus traffic incidents (highest and lowest counts). "
             + " ".join(lines)
         )
     return {
@@ -128,26 +159,228 @@ def _city_offense_doc() -> dict:
     }
 
 
-def _city_barangay_doc() -> dict:
+def _incident_rank_docs() -> list[dict]:
     df = get_barangay_stats_df()
     if df.empty:
-        body = "No barangay statistics available."
-    else:
-        top = df.sort_values("Count of barangay", ascending=False).head(15)
-        desc = "; ".join(
-            f"{row['Barangay Name']}: {int(row['Count of barangay'])}"
-            for _, row in top.iterrows()
+        return [
+            {
+                "title": "Highest-incident barangays",
+                "source_type": "city",
+                "barangay": None,
+                "body_text": "No barangay statistics available.",
+            }
+        ]
+
+    ranked = df.sort_values("Count of barangay", ascending=False)
+    top = ranked.head(15)
+    bottom = ranked.sort_values("Count of barangay", ascending=True).head(15)
+
+    top_rows = [
+        (
+            str(row["Barangay Name"]),
+            f"{int(row['Count of barangay'])} aggregated incidents",
         )
+        for _, row in top.iterrows()
+    ]
+    bottom_rows = [
+        (
+            str(row["Barangay Name"]),
+            f"{int(row['Count of barangay'])} aggregated incidents",
+        )
+        for _, row in bottom.iterrows()
+    ]
+
+    return [
+        {
+            "title": "Highest-incident barangays",
+            "source_type": "city",
+            "barangay": None,
+            "body_text": (
+                "Barangays with the highest aggregated historical incident counts across 2022–2024 "
+                "(most accidents / hotspots by recorded volume). Synonyms: highest, most incidents, "
+                "most accidents, dangerous by history, top hotspots.\n"
+                + _format_ranked_lines(top_rows)
+            ),
+        },
+        {
+            "title": "Lowest-incident barangays",
+            "source_type": "city",
+            "barangay": None,
+            "body_text": (
+                "Barangays with the lowest aggregated historical incident counts across 2022–2024 "
+                "(fewest accidents / safest by recorded volume). Synonyms: lowest, least accidents, "
+                "fewest incidents, safest by history, minimal incident count.\n"
+                + _format_ranked_lines(bottom_rows)
+            ),
+        },
+    ]
+
+
+def _peak_risk_rank_docs(model: AccidentModel) -> list[dict]:
+    """Citywide rankings by each barangay's peak and lowest predicted risk hour."""
+    rows = []
+    for barangay in model.barangays:
+        name = str(barangay)
+        try:
+            preds = model.predict_all_hours(name)
+        except Exception as exc:
+            logger.warning("Skipping peak-risk rank for %s: %s", name, exc)
+            continue
+        if not preds:
+            continue
+        peak_hour = max(preds, key=preds.get)
+        lowest_hour = min(preds, key=preds.get)
+        rows.append(
+            {
+                "barangay": name,
+                "peak_hour": peak_hour,
+                "peak_percent": float(preds[peak_hour]),
+                "lowest_hour": lowest_hour,
+                "lowest_percent": float(preds[lowest_hour]),
+            }
+        )
+
+    if not rows:
+        return []
+
+    by_peak_high = sorted(rows, key=lambda r: r["peak_percent"], reverse=True)[:15]
+    by_peak_low = sorted(rows, key=lambda r: r["peak_percent"])[:15]
+    by_lowest_hour = sorted(rows, key=lambda r: r["lowest_percent"])[:15]
+
+    high_lines = _format_ranked_lines(
+        [
+            (
+                r["barangay"],
+                f"peak predicted risk {r['peak_percent']}% ({risk_label(r['peak_percent'])}) "
+                f"at {r['peak_hour']}:00",
+            )
+            for r in by_peak_high
+        ]
+    )
+    low_peak_lines = _format_ranked_lines(
+        [
+            (
+                r["barangay"],
+                f"peak predicted risk only {r['peak_percent']}% ({risk_label(r['peak_percent'])}) "
+                f"at {r['peak_hour']}:00 — among the safest by model peak risk",
+            )
+            for r in by_peak_low
+        ]
+    )
+    calm_hour_lines = _format_ranked_lines(
+        [
+            (
+                r["barangay"],
+                f"lowest predicted hour risk {r['lowest_percent']}% "
+                f"({risk_label(r['lowest_percent'])}) at {r['lowest_hour']}:00",
+            )
+            for r in by_lowest_hour
+        ]
+    )
+
+    return [
+        {
+            "title": "Highest peak predicted risk barangays",
+            "source_type": "city",
+            "barangay": None,
+            "body_text": (
+                "Barangays ranked by highest peak predicted accident risk percentage from the "
+                "Random Forest model (most dangerous by model probability at their worst hour). "
+                "Synonyms: highest risk, most dangerous, elevated probability, high peak risk.\n"
+                + high_lines
+            ),
+        },
+        {
+            "title": "Lowest peak predicted risk barangays",
+            "source_type": "city",
+            "barangay": None,
+            "body_text": (
+                "Barangays ranked by lowest peak predicted accident risk percentage from the "
+                "Random Forest model (safest overall by model — their worst hour is still relatively low). "
+                "Synonyms: lowest risk, safest barangays, least dangerous, minimal peak risk, "
+                "safest by prediction.\n"
+                + low_peak_lines
+            ),
+        },
+        {
+            "title": "Lowest predicted hour risk by barangay",
+            "source_type": "city",
+            "barangay": None,
+            "body_text": (
+                "Barangays ranked by their calmest hour (lowest predicted risk percentage at any hour). "
+                "Useful for questions about safest hours or lowest risk times across the city.\n"
+                + calm_hour_lines
+            ),
+        },
+    ]
+
+
+def _city_hour_risk_doc(model: AccidentModel) -> dict:
+    averages = model.city_hour_averages or {}
+    if not averages:
+        body = "Citywide average predicted risk by hour is not available."
+    else:
+        ordered = sorted(averages.items(), key=lambda item: item[1], reverse=True)
+        peak_hours = ordered[:5]
+        calm_hours = sorted(averages.items(), key=lambda item: item[1])[:5]
+        peak_desc = "; ".join(f"{h}:00 → {pct}%" for h, pct in peak_hours)
+        calm_desc = "; ".join(f"{h}:00 → {pct}%" for h, pct in calm_hours)
         body = (
-            "Barangays with the highest aggregated incident counts across 2022–2024 "
-            f"(from barangay yearly stats): {desc}."
+            "Citywide average predicted accident risk by hour of day (mean across barangays). "
+            f"Highest average risk hours: {peak_desc}. "
+            f"Lowest average risk hours: {calm_desc}."
         )
     return {
-        "title": "Highest-incident barangays",
+        "title": "Citywide average risk by hour",
         "source_type": "city",
         "barangay": None,
         "body_text": body,
     }
+
+
+def _city_month_docs() -> list[dict]:
+    month_names = (
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December",
+    )
+    docs = []
+    for year in (2022, 2023, 2024):
+        data = get_month_totals(year)
+        monthly = data.get("monthly_totals") or {}
+        if not monthly:
+            continue
+        ranked = sorted(monthly.items(), key=lambda item: item[1], reverse=True)
+        top = ranked[:3]
+        bottom = sorted(monthly.items(), key=lambda item: item[1])[:3]
+        top_desc = "; ".join(
+            f"{month_names[m - 1]}: {total}" for m, total in top if 1 <= m <= 12
+        )
+        bottom_desc = "; ".join(
+            f"{month_names[m - 1]}: {total}" for m, total in bottom if 1 <= m <= 12
+        )
+        docs.append(
+            {
+                "title": f"Monthly offense highlights {year}",
+                "source_type": "city",
+                "barangay": None,
+                "body_text": (
+                    f"In {year}, monthly offense totals (highest months: {top_desc}; "
+                    f"lowest months: {bottom_desc}). Yearly total approximately "
+                    f"{data.get('yearly_total', 0)}."
+                ),
+            }
+        )
+    return docs
 
 
 def _city_year_docs() -> list[dict]:
@@ -210,12 +443,17 @@ def build_rag_corpus(force: bool = False) -> bool:
         documents: list[dict] = []
         documents.extend(FAQ_DOCS)
         documents.append(_city_offense_doc())
-        documents.append(_city_barangay_doc())
+        documents.extend(_incident_rank_docs())
+        documents.extend(_peak_risk_rank_docs(model))
+        documents.append(_city_hour_risk_doc(model))
         documents.extend(_city_year_docs())
+        documents.extend(_city_month_docs())
 
         for barangay in model.barangays:
             try:
-                report = generate_summary_report(str(barangay), model, selected_hour=None)
+                report = generate_summary_report(
+                    str(barangay), model, selected_hour=None
+                )
                 documents.append(
                     {
                         "title": f"Barangay insight: {report['barangay_name']}",
@@ -230,7 +468,7 @@ def build_rag_corpus(force: bool = False) -> bool:
         logger.info("Embedding %s documents...", len(documents))
         total_chunks = 0
         for doc in documents:
-            pieces = chunk_text(doc["body_text"])
+            pieces = chunk_text(doc["body_text"], size=900, overlap=100)
             if not pieces:
                 continue
             rag_doc = RagDocument(
@@ -271,4 +509,11 @@ def build_rag_corpus(force: bool = False) -> bool:
 
 if __name__ == "__main__":
     force = "--force" in sys.argv
-    build_rag_corpus(force=force)
+    try:
+        build_rag_corpus(force=force)
+    except Exception:
+        # Keep Docker/Render bootable; chat returns 503 until corpus succeeds.
+        logger.exception(
+            "RAG corpus build failed; starting without chat until rebuild succeeds."
+        )
+        sys.exit(0)

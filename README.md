@@ -21,6 +21,7 @@ RideSafe is a traffic safety platform that uses historical incident data (2022â€
   <img src="static/screenshots/heat-map.jpg" alt="Heatmap" width="400">
   <img src="static/screenshots/prediction.jpg" alt="Prediction" width="400">
   <img src="static/screenshots/report.jpg" alt="Report" width="400">
+   <img src="static/screenshots/chatbot.jpg" alt="chatbot" width="400">
 </div>
 
 ## Features
@@ -39,7 +40,7 @@ RideSafe is a traffic safety platform that uses historical incident data (2022â€
 - **Backend**: Flask (Python 3.12+)
 - **Database**: PostgreSQL + pgvector (production / Docker) / SQLite (local fallback; dashboard only)
 - **Machine learning**: Scikit-learn (Random Forest + SMOTE)
-- **LLM / RAG**: Google Gemini (`text-embedding-004`, flash chat) via `GOOGLE_API_KEY`
+- **LLM / RAG**: Google Gemini (`gemini-embedding-001`, flash chat) via `GOOGLE_API_KEY`
 - **Frontend**: HTML5, CSS3, JavaScript, Plotly.js
 - **Mapping**: Folium, GeoPandas
 - **Report generation**: pdfkit (wkhtmltopdf), Jinja2
@@ -138,8 +139,9 @@ Always ping **`/health`**, not `/` (the homepage is expensive to generate).
 | -------- | ----------- | ------- |
 | `DATABASE_URL` | Postgres connection string | SQLite at `.data/ridesafe.db` |
 | `GOOGLE_API_KEY` | Gemini API key for embeddings + chat | unset (chat unavailable) |
-| `GEMINI_EMBED_MODEL` | Embedding model name | `text-embedding-004` |
-| `GEMINI_CHAT_MODEL` | Chat model name | `gemini-2.0-flash` |
+| `GEMINI_EMBED_MODEL` | Embedding model name | `gemini-embedding-001` |
+| `GEMINI_CHAT_MODEL` | Chat model name | `gemini-flash-latest` |
+| `GEMINI_CHAT_FALLBACKS` | Comma-separated fallbacks on 429/503 | `gemini-flash-lite-latest,gemini-3.5-flash-lite,gemini-3.1-flash-lite` |
 | `WKHTMLTOPDF_PATH` | Path to wkhtmltopdf binary | Auto-detected |
 | `WEB_CONCURRENCY` | Gunicorn worker count | `1` |
 | `LOG_LEVEL` | Python log level | `INFO` |

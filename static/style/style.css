@@ -163,10 +163,21 @@ body {
 
 .chat-page {
   max-width: 800px;
+  width: 100%;
   display: flex;
   flex-direction: column;
   gap: 1rem;
-  min-height: calc(100vh - 5rem);
+  /* Cap page to viewport so the panel scrolls instead of growing */
+  height: calc(100dvh - 4.75rem);
+  max-height: calc(100dvh - 4.75rem);
+  min-height: 0;
+  padding-bottom: 1rem;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.chat-intro {
+  flex-shrink: 0;
 }
 
 .chat-intro h1 {
@@ -184,18 +195,59 @@ body {
 .chat-panel {
   display: flex;
   flex-direction: column;
-  flex: 1;
-  min-height: min(70vh, 640px);
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: 100%;
   overflow: hidden;
 }
 
 .chat-messages {
-  flex: 1;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
   overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 1rem;
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(94, 234, 212, 0.55) rgba(12, 17, 27, 0.65);
+}
+
+.chat-messages::-webkit-scrollbar {
+  width: 8px;
+}
+
+.chat-messages::-webkit-scrollbar-track {
+  margin: 0.35rem 0;
+  background: rgba(12, 17, 27, 0.55);
+  border-radius: 999px;
+  border: 1px solid var(--border-subtle);
+}
+
+.chat-messages::-webkit-scrollbar-thumb {
+  background: linear-gradient(
+    180deg,
+    rgba(94, 234, 212, 0.75),
+    rgba(45, 212, 191, 0.45)
+  );
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.chat-messages::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(
+    180deg,
+    var(--accent),
+    var(--accent-strong)
+  );
+  background-clip: padding-box;
+}
+
+.chat-messages::-webkit-scrollbar-corner {
+  background: transparent;
 }
 
 .chat-bubble {
@@ -225,6 +277,11 @@ body {
   background: var(--bg-card);
 }
 
+.chat-bubble .chat-hl {
+  font-weight: 700;
+  color: var(--accent);
+}
+
 .chat-sources {
   list-style: none;
   margin: 0.65rem 0 0;
@@ -249,6 +306,7 @@ body {
   padding: 0.85rem 1rem 1rem;
   border-top: 1px solid var(--border-subtle);
   align-items: flex-end;
+  flex-shrink: 0;
 }
 
 .chat-form textarea {
@@ -279,6 +337,7 @@ body {
   margin: 0 1rem 0.85rem;
   font-size: 0.8125rem;
   color: var(--text-muted);
+  flex-shrink: 0;
 }
 
 .chat-status--error {
