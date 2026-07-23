@@ -1,19 +1,25 @@
 import os
 from pathlib import Path
 
+from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
     Column,
     Date,
+    ForeignKey,
     Integer,
     String,
+    Text,
     Time,
     create_engine,
     func,
+    text,
 )
-from sqlalchemy.orm import DeclarativeBase, sessionmaker
+from sqlalchemy.orm import DeclarativeBase, relationship, sessionmaker
 
 _engine = None
 SessionLocal = None
+
+EMBEDDING_DIM = 768
 
 
 class Base(DeclarativeBase):
@@ -55,6 +61,36 @@ class DailyOffenseCount(Base):
     count = Column(Integer, nullable=False, default=0)
 
 
+class RagDocument(Base):
+    __tablename__ = "rag_documents"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    title = Column(String(256), nullable=False)
+    source_type = Column(String(32), nullable=False, index=True)
+    barangay = Column(String(128), nullable=True, index=True)
+    body_text = Column(Text, nullable=False)
+
+    chunks = relationship(
+        "RagChunk", back_populates="document", cascade="all, delete-orphan"
+    )
+
+
+class RagChunk(Base):
+    __tablename__ = "rag_chunks"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    document_id = Column(
+        Integer,
+        ForeignKey("rag_documents.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    chunk_text = Column(Text, nullable=False)
+    embedding = Column(Vector(EMBEDDING_DIM), nullable=True)
+
+    document = relationship("RagDocument", back_populates="chunks")
+
+
 def _normalize_database_url(url: str) -> str:
     if url.startswith("postgres://"):
         return url.replace("postgres://", "postgresql://", 1)
@@ -70,6 +106,10 @@ def get_database_url() -> str:
     return f"sqlite:///{data_dir / 'ridesafe.db'}"
 
 
+def is_postgres() -> bool:
+    return get_database_url().startswith("postgresql")
+
+
 def init_db():
     global _engine, SessionLocal
     if _engine is not None:
@@ -79,7 +119,19 @@ def init_db():
     connect_args = {"check_same_thread": False} if url.startswith("sqlite") else {}
     _engine = create_engine(url, connect_args=connect_args)
     SessionLocal = sessionmaker(bind=_engine, autoflush=False, autocommit=False)
-    Base.metadata.create_all(_engine)
+
+    if url.startswith("postgresql"):
+        with _engine.begin() as conn:
+            conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
+        Base.metadata.create_all(_engine)
+    else:
+        # Skip RAG tables on SQLite (pgvector unsupported)
+        analytics = [
+            t
+            for t in Base.metadata.sorted_tables
+            if t.name not in ("rag_documents", "rag_chunks")
+        ]
+        Base.metadata.create_all(_engine, tables=analytics)
 
 
 def get_session():
@@ -90,3 +142,10 @@ def get_session():
 
 def incident_count(session) -> int:
     return session.query(func.count(Incident.id)).scalar() or 0
+
+
+def rag_chunk_count(session) -> int:
+    try:
+        return session.query(func.count(RagChunk.id)).scalar() or 0
+    except Exception:
+        return 0

@@ -16,6 +16,8 @@ from scripts.summary_report import generate_summary_report
 from scripts.db import init_db
 from scripts.seed_database import seed_database
 from scripts.cache import warm_dashboard_cache, get_dashboard_html, get_barangay_list_cached
+from scripts.rag import RagUnavailable, answer_question
+from scripts.build_rag_corpus import build_rag_corpus
 
 _log_level = os.environ.get("LOG_LEVEL", "INFO").upper()
 logging.basicConfig(
@@ -39,6 +41,10 @@ accident_model = AccidentModel()
 def _initialize_app():
     init_db()
     seed_database()
+    try:
+        build_rag_corpus(force=False)
+    except Exception:
+        logging.exception("RAG corpus build failed; chat may be unavailable")
     accident_model.load_model()
     accident_model.precompute_city_hour_averages()
     warm_dashboard_cache()
@@ -144,6 +150,28 @@ def _wkhtmltopdf_config():
     raise FileNotFoundError(
         "wkhtmltopdf not found. Install wkhtmltopdf or set WKHTMLTOPDF_PATH."
     )
+
+
+@app.route("/chat")
+def chat_page():
+    return render_template("chat.html")
+
+
+@app.route("/api/chat", methods=["POST"])
+@limiter.limit("10 per minute")
+def api_chat():
+    try:
+        data = request.get_json(silent=True) or {}
+        message = data.get("message", "")
+        result = answer_question(message)
+        return jsonify(result)
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    except RagUnavailable as e:
+        return jsonify({"error": str(e)}), 503
+    except Exception:
+        logging.exception("Error in api_chat")
+        return jsonify({"error": "Unable to answer right now. Please try again."}), 500
 
 
 @app.route("/getSummaryReport/<string:barangay>", methods=["GET"])

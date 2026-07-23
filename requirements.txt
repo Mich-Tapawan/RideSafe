@@ -15,3 +15,5 @@ pdfkit==1.0.0
 sqlalchemy==2.0.36
 psycopg2-binary==2.9.12
 flask-limiter==4.1.1
+pgvector==0.3.6
+google-genai==1.14.0

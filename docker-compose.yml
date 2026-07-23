@@ -1,6 +1,6 @@
 services:
   db:
-    image: postgres:16-alpine
+    image: pgvector/pgvector:pg16
     environment:
       POSTGRES_USER: ridesafe
       POSTGRES_PASSWORD: ridesafe
@@ -19,6 +19,9 @@ services:
     build: .
     ports:
       - "10000:10000"
+    env_file:
+      - path: .env
+        required: false
     environment:
       PORT: "10000"
       DATABASE_URL: postgresql://ridesafe:ridesafe@db:5432/ridesafe

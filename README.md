@@ -12,7 +12,7 @@
 
 ## Overview
 
-RideSafe is a traffic safety platform that uses historical incident data (2022–2024) and machine learning to help analyze accident patterns in Imus City. Users can explore interactive dashboards and heatmaps, run barangay-level risk predictions, and download PDF summary reports.
+RideSafe is a traffic safety platform that uses historical incident data (2022–2024) and machine learning to help analyze accident patterns in Imus City. Users can explore interactive dashboards and heatmaps, run barangay-level risk predictions, download PDF summary reports, and ask questions via an optional RAG chatbot grounded in curated insights.
 
 ## Screenshots
 
@@ -31,13 +31,15 @@ RideSafe is a traffic safety platform that uses historical incident data (2022�
 - **Interactive dashboards**: Dynamic bar graphs, heatmaps, and time-series charts built with Plotly and Folium
 - **PDF reports**: Multi-section barangay summary (KPIs, hourly chart, historical breakdown, ML recommendations) — run a prediction first, then download
 - **Geospatial analysis**: Accident density mapping using GeoJSON data of Imus barangays
+- **Ask RideSafe**: RAG chatbot (`/chat`) — insight text from analytics tables, Gemini embeddings + answers, stored in Postgres with pgvector
 - **Production-ready**: Postgres-backed data layer, startup caching, health checks, and rate limiting
 
 ## Tech Stack
 
 - **Backend**: Flask (Python 3.12+)
-- **Database**: PostgreSQL (production) / SQLite (local fallback)
+- **Database**: PostgreSQL + pgvector (production / Docker) / SQLite (local fallback; dashboard only)
 - **Machine learning**: Scikit-learn (Random Forest + SMOTE)
+- **LLM / RAG**: Google Gemini (`text-embedding-004`, flash chat) via `GOOGLE_API_KEY`
 - **Frontend**: HTML5, CSS3, JavaScript, Plotly.js
 - **Mapping**: Folium, GeoPandas
 - **Report generation**: pdfkit (wkhtmltopdf), Jinja2
@@ -84,21 +86,39 @@ RideSafe is a traffic safety platform that uses historical incident data (2022�
 
 ### Local development (Docker + Postgres)
 
-```bash
-docker compose up --build
-```
+1. Create a `.env` file in the project root (gitignored) with your Gemini API key:
 
-Open `http://localhost:10000`. The web container seeds the database automatically on first start.
+   ```bash
+   GOOGLE_API_KEY=your_key_here
+   ```
+
+2. Start Postgres (pgvector) + the app:
+
+   ```bash
+   docker compose up --build
+   ```
+
+Open `http://localhost:10000`. The web container seeds analytics, builds the RAG corpus (when `GOOGLE_API_KEY` is set), then starts Gunicorn.
+
+Without `GOOGLE_API_KEY`, the dashboard still runs; `/chat` and `/api/chat` return a clear “not ready” / missing-key message.
 
 ### Production (Render)
 
 Deploy with the included [`render.yaml`](render.yaml) Blueprint. It provisions:
 
-- A **PostgreSQL** database (`ridesafe-db`)
+- A **PostgreSQL** database (`ridesafe-db`) — enable/use the `vector` extension (created on app startup)
 - A **Docker web service** with `DATABASE_URL` linked automatically
 - Health checks on `/health`
 
-The Docker entrypoint runs `python -m scripts.seed_database` before Gunicorn (idempotent — skips if data exists).
+Set **`GOOGLE_API_KEY`** in the Render dashboard (Blueprint marks it as a sync env var — you supply the value). Without it, the site boots but the chatbot corpus is skipped.
+
+The Docker entrypoint runs:
+
+```text
+python -m scripts.seed_database && python -m scripts.build_rag_corpus && gunicorn ...
+```
+
+Both seed and corpus steps are idempotent (skip when already populated).
 
 ### Keeping the free tier awake
 
@@ -117,11 +137,16 @@ Always ping **`/health`**, not `/` (the homepage is expensive to generate).
 | Variable | Description | Default |
 | -------- | ----------- | ------- |
 | `DATABASE_URL` | Postgres connection string | SQLite at `.data/ridesafe.db` |
+| `GOOGLE_API_KEY` | Gemini API key for embeddings + chat | unset (chat unavailable) |
+| `GEMINI_EMBED_MODEL` | Embedding model name | `text-embedding-004` |
+| `GEMINI_CHAT_MODEL` | Chat model name | `gemini-2.0-flash` |
 | `WKHTMLTOPDF_PATH` | Path to wkhtmltopdf binary | Auto-detected |
 | `WEB_CONCURRENCY` | Gunicorn worker count | `1` |
 | `LOG_LEVEL` | Python log level | `INFO` |
 | `FLASK_DEBUG` | Enable Flask debug mode (`1` to enable) | off |
 | `EXCEL_FILE_PATH` | Path to xlsx for seeding | `traffic-incident.xlsx` |
+
+Do not commit API keys; keep `.env` gitignored.
 
 ## Data updates
 
@@ -134,13 +159,19 @@ Runtime reads from the database, not the xlsx file. To refresh data:
    python -m scripts.seed_database --force
    ```
 
-   On Render, run the same command via the shell or redeploy after clearing the database.
+3. Rebuild the RAG corpus (Postgres + `GOOGLE_API_KEY` required):
+
+   ```bash
+   python -m scripts.build_rag_corpus --force
+   ```
+
+   On Render, run the same commands via the shell, or redeploy after clearing the relevant tables.
 
 ## Architecture
 
-On startup the app: initializes the DB → seeds from xlsx (if empty) → loads the ML model → precomputes city-wide hourly averages → warms the dashboard HTML cache.
+On startup the app: initializes the DB (incl. `CREATE EXTENSION vector` on Postgres) → seeds from xlsx (if empty) → builds RAG corpus if empty → loads the ML model → precomputes city-wide hourly averages → warms the dashboard HTML cache.
 
-The homepage and barangay list are served from in-memory cache. API endpoints query Postgres/SQLite. PDF reports combine DB incident history with ML predictions.
+The homepage and barangay list are served from in-memory cache. API endpoints query Postgres/SQLite. PDF reports combine DB incident history with ML predictions. Chat retrieves embedded insight chunks via pgvector cosine search, then answers with Gemini.
 
 ### Project structure
 
@@ -155,9 +186,11 @@ RideSafe/
 ├── Procfile
 │
 ├── scripts/
-│   ├── db.py                     # SQLAlchemy models & session
+│   ├── db.py                     # SQLAlchemy models & session (incl. RAG tables)
 │   ├── repository.py             # DB query helpers
 │   ├── seed_database.py          # xlsx → DB import
+│   ├── build_rag_corpus.py       # Insight docs + Gemini embeddings → pgvector
+│   ├── rag.py                    # Embed, retrieve, answer
 │   ├── cache.py                  # Dashboard warmup cache
 │   ├── model.py                  # Random Forest prediction model
 │   ├── bar_graph.py              # Plotly trend charts
@@ -169,11 +202,12 @@ RideSafe/
 │
 ├── templates/
 │   ├── index.html
+│   ├── chat.html
 │   └── pdf_template.html
 │
 └── static/
     ├── assets/
-    ├── js/
+    ├── js/                       # index.js, chat.js
     └── style/
 ```
 
@@ -183,12 +217,14 @@ RideSafe/
 | ------------------------------ | ------ | ----------------------------------------------------------------- |
 | `/health`                      | GET    | Health check (`{"status": "ok"}`)                               |
 | `/`                            | GET    | Main dashboard with visualizations (cached)                       |
+| `/chat`                        | GET    | Ask RideSafe chatbot page                                         |
+| `/api/chat`                    | POST   | RAG answer (`{"message": "..."}` → `answer`, `sources`)         |
 | `/getMonthData`                | POST   | Monthly accident statistics (`year`, `month`)                     |
 | `/predict`                     | POST   | ML accident probability (`barangay`, `hour`)                      |
 | `/getBarangayList`             | GET    | List of barangays from incident data                              |
 | `/getSummaryReport/<barangay>` | GET    | PDF summary report (`?hour=8` optional, highlights selected hour) |
 
-Rate limits: `/` — 30/min, `/getSummaryReport` — 10/min.
+Rate limits: `/` — 30/min, `/getSummaryReport` and `/api/chat` — 10/min.
 
 ## Machine Learning Model
 

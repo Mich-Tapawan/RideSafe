@@ -26,4 +26,4 @@ COPY . .
 
 EXPOSE 10000
 
-CMD ["sh", "-c", "python -m scripts.seed_database && gunicorn --bind 0.0.0.0:${PORT:-10000} --workers ${WEB_CONCURRENCY:-1} --timeout 120 --access-logfile - app:app"]
+CMD ["sh", "-c", "python -m scripts.seed_database && python -m scripts.build_rag_corpus && gunicorn --bind 0.0.0.0:${PORT:-10000} --workers ${WEB_CONCURRENCY:-1} --timeout 120 --access-logfile - app:app"]
