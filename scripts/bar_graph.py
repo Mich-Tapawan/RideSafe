@@ -57,10 +57,23 @@ def generate_bar_graph():
         plot_bgcolor="#0B2C40",
         paper_bgcolor="#001D3D",
         font=dict(color="white"),
-        legend=dict(title="Years", font=dict(size=12)),
-        height=600,
+        legend=dict(
+            title="Years",
+            font=dict(size=12),
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="right",
+            x=1,
+        ),
+        height=420,
+        autosize=True,
+        margin=dict(l=56, r=24, t=56, b=72),
     )
 
     fig.update_traces(hovertemplate="%{hovertext}<br>Accidents: %{y}")
 
-    return fig.to_html(full_html=False)
+    return fig.to_html(
+        full_html=False,
+        config={"responsive": True, "displayModeBar": False},
+    )

@@ -17,7 +17,27 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function notifyVizResize() {
     window.dispatchEvent(new Event("resize"));
+    if (typeof Plotly === "undefined") {
+      return;
+    }
+    document
+      .querySelectorAll(
+        "#bar-graph:not([hidden]) .plotly-graph-div, #heat-map:not([hidden]) .plotly-graph-div, .donut-chart.active .plotly-graph-div",
+      )
+      .forEach((el) => {
+        try {
+          Plotly.Plots.resize(el);
+        } catch {
+          /* plot may not be ready */
+        }
+      });
   }
+
+  requestAnimationFrame(() => notifyVizResize());
+  window.addEventListener("resize", () => {
+    clearTimeout(window.__ridesafeResizeTimer);
+    window.__ridesafeResizeTimer = setTimeout(() => notifyVizResize(), 150);
+  });
 
   toggleBtn.addEventListener("click", () => {
     const showingBar = toggleBtn.dataset.view === "bar";
