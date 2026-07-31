@@ -163,8 +163,12 @@ def build_offense_guide() -> dict[str, Any]:
             }
         )
 
-    items.sort(key=lambda row: row["total_count"], reverse=True)
-    top = items[0] if items else None
+    items.sort(
+        key=lambda row: int(
+            str(row.get("chart_label", "Offense 0")).replace("Offense ", "") or 0
+        )
+    )
+    top = max(items, key=lambda row: row["total_count"]) if items else None
 
     return {
         "intro": (

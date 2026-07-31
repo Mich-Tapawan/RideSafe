@@ -177,7 +177,8 @@ body.dashboard-app {
 .chat-intro h1 svg,
 .header h1 svg,
 .barangay-insight__head h3 svg,
-.offense-card__head h3 svg,
+.offense-card__title svg,
+.offense-card__chevron,
 .btn svg,
 .chat-quota svg,
 .overview-kicker svg,
@@ -203,7 +204,7 @@ body.dashboard-app {
 .chat-intro h1,
 .header h1,
 .barangay-insight__head h3,
-.offense-card__head h3,
+.offense-card__title,
 .dashboard-topbar__title,
 .modal__panel h2,
 .overview-kicker,
@@ -749,27 +750,54 @@ body.dashboard-app {
 }
 
 .offense-glossary__list {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
 }
 
 .offense-card {
-  padding: 0.9rem 1rem;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border-subtle);
   background: rgba(0, 0, 0, 0.2);
-  display: flex;
-  flex-direction: column;
-  gap: 0.45rem;
   min-width: 0;
+  overflow: hidden;
+  interpolate-size: allow-keywords;
 }
 
-.offense-card__head {
+.offense-card::details-content {
+  block-size: 0;
+  overflow: hidden;
+  transition:
+    block-size 0.32s ease,
+    content-visibility 0.32s allow-discrete;
+}
+
+.offense-card[open]::details-content {
+  block-size: auto;
+}
+
+.offense-card__summary {
+  list-style: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
+  user-select: none;
+  transition: background 0.25s ease;
+}
+
+.offense-card__summary::-webkit-details-marker {
+  display: none;
+}
+
+.offense-card__summary-main {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 0.5rem 0.75rem;
+  min-width: 0;
 }
 
 .offense-card__badge {
@@ -784,10 +812,47 @@ body.dashboard-app {
   background: var(--accent);
 }
 
-.offense-card__head h3 {
-  margin: 0;
+.offense-card__title {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
   font-size: 1rem;
   font-family: var(--font-display);
+  font-weight: 600;
+  color: var(--text);
+}
+
+.offense-card__chevron {
+  width: 1.1rem;
+  height: 1.1rem;
+  flex-shrink: 0;
+  color: var(--text-muted);
+  transition:
+    transform 0.32s ease,
+    color 0.25s ease;
+}
+
+.offense-card[open] .offense-card__chevron {
+  transform: rotate(180deg);
+  color: var(--accent);
+}
+
+.offense-card[open] .offense-card__summary {
+  border-bottom: 1px solid var(--border-subtle);
+  background: rgba(94, 234, 212, 0.06);
+}
+
+.offense-card__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  padding: 0.85rem 1rem 1rem;
+  overflow: hidden;
+}
+
+/* JS-driven height animation fallback (browsers without ::details-content) */
+.offense-card.is-animating .offense-card__body {
+  will-change: height, opacity;
 }
 
 .offense-card__full {
@@ -798,7 +863,7 @@ body.dashboard-app {
   word-break: break-word;
 }
 
-.offense-card p {
+.offense-card__body p {
   margin: 0;
   font-size: 0.82rem;
   line-height: 1.4;
@@ -817,9 +882,24 @@ body.dashboard-app {
   border-top: 1px solid var(--border-subtle);
 }
 
-@media (max-width: 900px) {
-  .offense-glossary__list {
-    grid-template-columns: 1fr;
+.offense-card__summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+@supports not (interpolate-size: allow-keywords) {
+  .offense-card::details-content {
+    transition: none;
+    block-size: auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .offense-card::details-content,
+  .offense-card__chevron,
+  .offense-card__summary,
+  .offense-card__body {
+    transition: none !important;
   }
 }
 

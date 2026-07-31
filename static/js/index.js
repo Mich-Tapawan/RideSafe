@@ -420,28 +420,119 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
     list.innerHTML = "";
-    (guide.items || []).forEach((item) => {
-      const article = document.createElement("article");
-      article.className = "offense-card";
-      article.innerHTML = `
-        <header class="offense-card__head">
-          <span class="offense-card__badge">${item.chart_label}</span>
-          <h3><i data-lucide="scale" aria-hidden="true"></i> ${item.short_label}</h3>
-        </header>
-        <p class="offense-card__full">${item.offense_type}</p>
-        <p class="offense-card__meta"><strong>Legal basis:</strong> ${item.legal_basis}</p>
-        <p><strong>Meaning:</strong> ${item.meaning}</p>
-        <p class="offense-card__insight"><strong>Insight:</strong> ${item.insight}</p>
-        <p class="offense-card__counts">
-          Totals — 2022: ${Number(item.by_year["2022"] || 0).toLocaleString()},
-          2023: ${Number(item.by_year["2023"] || 0).toLocaleString()},
-          2024: ${Number(item.by_year["2024"] || 0).toLocaleString()}
-          (all years: ${Number(item.total_count || 0).toLocaleString()})
-        </p>
+    (guide.items || []).forEach((item, index) => {
+      const details = document.createElement("details");
+      details.className = "offense-card";
+      if (index === 0) {
+        details.open = true;
+      }
+      details.innerHTML = `
+        <summary class="offense-card__summary">
+          <span class="offense-card__summary-main">
+            <span class="offense-card__badge">${item.chart_label}</span>
+            <span class="offense-card__title">
+              <i data-lucide="scale" aria-hidden="true"></i>
+              ${item.short_label}
+            </span>
+          </span>
+          <i data-lucide="chevron-down" class="offense-card__chevron" aria-hidden="true"></i>
+        </summary>
+        <div class="offense-card__body">
+          <p class="offense-card__full">${item.offense_type}</p>
+          <p class="offense-card__meta"><strong>Legal basis:</strong> ${item.legal_basis}</p>
+          <p><strong>Meaning:</strong> ${item.meaning}</p>
+          <p class="offense-card__insight"><strong>Insight:</strong> ${item.insight}</p>
+          <p class="offense-card__counts">
+            Totals — 2022: ${Number(item.by_year["2022"] || 0).toLocaleString()},
+            2023: ${Number(item.by_year["2023"] || 0).toLocaleString()},
+            2024: ${Number(item.by_year["2024"] || 0).toLocaleString()}
+            (all years: ${Number(item.total_count || 0).toLocaleString()})
+          </p>
+        </div>
       `;
-      list.appendChild(article);
+      list.appendChild(details);
     });
+    bindOffenseDropdownAnimations(list);
     refreshIcons();
+  }
+
+  function prefersReducedMotion() {
+    return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  }
+
+  function supportsDetailsContentAnim() {
+    return (
+      typeof CSS !== "undefined" &&
+      CSS.supports &&
+      CSS.supports("interpolate-size", "allow-keywords")
+    );
+  }
+
+  function bindOffenseDropdownAnimations(list) {
+    if (!list || prefersReducedMotion() || supportsDetailsContentAnim()) {
+      return;
+    }
+
+    list.querySelectorAll("details.offense-card").forEach((details) => {
+      const summary = details.querySelector("summary");
+      const body = details.querySelector(".offense-card__body");
+      if (!summary || !body || details.dataset.boundAnim === "1") {
+        return;
+      }
+      details.dataset.boundAnim = "1";
+
+      summary.addEventListener("click", (event) => {
+        event.preventDefault();
+        if (details.classList.contains("is-animating")) {
+          return;
+        }
+
+        const durationMs = 320;
+        details.classList.add("is-animating");
+
+        if (details.open) {
+          const startHeight = body.scrollHeight;
+          body.style.height = `${startHeight}px`;
+          body.style.opacity = "1";
+          // force reflow
+          void body.offsetHeight;
+          body.style.transition =
+            "height 0.32s ease, opacity 0.25s ease, padding 0.32s ease";
+          body.style.height = "0px";
+          body.style.opacity = "0";
+          body.style.paddingTop = "0";
+          body.style.paddingBottom = "0";
+
+          window.setTimeout(() => {
+            details.open = false;
+            body.style.height = "";
+            body.style.opacity = "";
+            body.style.transition = "";
+            body.style.paddingTop = "";
+            body.style.paddingBottom = "";
+            details.classList.remove("is-animating");
+          }, durationMs);
+        } else {
+          details.open = true;
+          const endHeight = body.scrollHeight;
+          body.style.height = "0px";
+          body.style.opacity = "0";
+          body.style.overflow = "hidden";
+          void body.offsetHeight;
+          body.style.transition = "height 0.32s ease, opacity 0.25s ease";
+          body.style.height = `${endHeight}px`;
+          body.style.opacity = "1";
+
+          window.setTimeout(() => {
+            body.style.height = "";
+            body.style.opacity = "";
+            body.style.transition = "";
+            body.style.overflow = "";
+            details.classList.remove("is-animating");
+          }, durationMs);
+        }
+      });
+    });
   }
 
   async function loadCityInsights() {
