@@ -38,6 +38,8 @@ document.addEventListener("DOMContentLoaded", () => {
   const sidebarBackdrop = document.getElementById("sidebar-backdrop");
   const navButtons = document.querySelectorAll(".sidebar-link[data-nav]");
   const viewPanels = document.querySelectorAll(".view-panel[data-view]");
+  const contentViewport = document.querySelector(".content-viewport");
+  let activeView = null;
 
   const api = (path) => path;
 
@@ -105,6 +107,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function setView(name, { updateHistory = true } = {}) {
     const view = VALID_VIEWS.includes(name) ? name : "overview";
+    const viewChanged = view !== activeView;
+    activeView = view;
 
     viewPanels.forEach((panel) => {
       const match = panel.dataset.view === view;
@@ -133,6 +137,10 @@ document.addEventListener("DOMContentLoaded", () => {
       url.searchParams.delete("view");
       url.hash = view;
       history.replaceState(null, "", url.pathname + url.search + url.hash);
+    }
+
+    if (viewChanged && contentViewport) {
+      contentViewport.scrollTop = 0;
     }
 
     closeMobileSidebar();
