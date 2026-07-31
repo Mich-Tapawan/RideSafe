@@ -33,7 +33,7 @@ RideSafe is a traffic safety platform that uses historical incident data (2022�
 - **PDF reports**: Multi-section barangay summary (KPIs, hourly chart, historical breakdown, ML recommendations) — run a prediction first, then download
 - **Geospatial analysis**: Accident density mapping using GeoJSON data of Imus barangays
 - **Ask RideSafe**: In-dashboard RAG chatbot (`/#ask`, `/chat` redirects) with Gemini + pgvector retrieval, plus allowlisted live DB/ML tools for rankings and predictions
-- **Sidebar dashboard**: Full-screen shell with Overview, Offense Analytics, Map & Predictions, and Ask RideSafe views (no full page reloads)
+- **Sidebar dashboard**: Full-screen shell with Overview, Offense Analytics (glossary), Geospatial Heatmap, Predictions, and Ask RideSafe
 - **Production-ready**: Postgres-backed data layer, startup caching, health checks, and rate limiting
 
 ## Tech Stack
@@ -197,6 +197,7 @@ RideSafe/
 │   ├── build_rag_corpus.py       # Insight docs + Gemini embeddings → pgvector
 │   ├── rag.py                    # Embed, retrieve, answer (+ tool calling)
 │   ├── chat_tools.py             # Allowlisted live DB/ML chat tools
+│   ├── dashboard_insights.py     # City KPIs / rankings / barangay insight cards
 │   ├── cache.py                  # Dashboard warmup cache
 │   ├── model.py                  # Random Forest prediction model
 │   ├── bar_graph.py              # Plotly trend charts
@@ -223,12 +224,14 @@ RideSafe/
 | Endpoint                       | Method | Description                                                       |
 | ------------------------------ | ------ | ----------------------------------------------------------------- |
 | `/health`                      | GET    | Health check (`{"status": "ok"}`)                               |
-| `/`                            | GET    | Sidebar dashboard (Overview / Offense / Map / Ask); hash deep-links `#overview` `#offense` `#map` `#ask` |
+| `/`                            | GET    | Sidebar dashboard (Overview / Offense / Heatmap / Predictions / Ask); hashes `#overview` `#offense` `#heatmap` `#predict` `#ask` |
 | `/chat`                        | GET    | Redirects to `/?view=ask` (Ask RideSafe view)                     |
 | `/api/chat`                    | POST   | RAG + live tools (`message`); guest limit 3/hour; admin unlimited |
 | `/api/chat/status`             | GET    | `{ admin, user_limit }` session status                            |
 | `/api/chat/admin/login`        | POST   | Unlock admin (`password`)                                         |
 | `/api/chat/admin/logout`       | POST   | Exit admin mode                                                   |
+| `/api/dashboard/insights`      | GET    | Cached city KPIs, hotspot/peak-risk rankings, hour-risk series    |
+| `/api/dashboard/barangay-insight/<barangay>` | GET | Compact barangay insight (`?hour=` optional)               |
 | `/getMonthData`                | POST   | Monthly accident statistics (`year`, `month`)                     |
 | `/predict`                     | POST   | ML accident probability (`barangay`, `hour`)                      |
 | `/getBarangayList`             | GET    | List of barangays from incident data                              |

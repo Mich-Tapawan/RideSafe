@@ -99,7 +99,7 @@ def _build_chart(predictions, peak_hour, lowest_hour, selected_hour):
     return base64.b64encode(buffer.read()).decode("ascii")
 
 
-def generate_summary_report(barangay, accident_model, selected_hour=None):
+def generate_summary_report(barangay, accident_model, selected_hour=None, include_chart=True):
     barangay = barangay.strip().upper()
     if barangay not in accident_model.barangays:
         raise ValueError(f"Invalid barangay: {barangay}")
@@ -190,5 +190,9 @@ def generate_summary_report(barangay, accident_model, selected_hour=None):
         "quarter_breakdown": quarter_breakdown,
         "year_breakdown": year_breakdown,
         "recommendations": recommendations,
-        "chart_base64": _build_chart(predictions, peak_hour, lowest_hour, selected_hour_key),
+        "chart_base64": (
+            _build_chart(predictions, peak_hour, lowest_hour, selected_hour_key)
+            if include_chart
+            else None
+        ),
     }

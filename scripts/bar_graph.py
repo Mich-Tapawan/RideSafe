@@ -1,6 +1,6 @@
-import pandas as pd
 import plotly.graph_objects as go
 
+from scripts.offense_guide import offense_chart_mapping
 from scripts.repository import get_offense_stats_df
 
 
@@ -10,16 +10,15 @@ def generate_bar_graph():
     if df_combined.empty:
         return "<p>No offense data available.</p>"
 
+    df_combined = df_combined.copy()
     df_combined["Offense Type"] = (
         df_combined["Offense Type"].str.strip().str.lower().str.title()
     )
 
-    unique_offenses = df_combined["Offense Type"].unique()
-    offense_mapping = {
-        original: f"Offense {i + 1}" for i, original in enumerate(unique_offenses)
-    }
-
-    df_combined["Simplified Offense Type"] = df_combined["Offense Type"].map(offense_mapping)
+    offense_mapping = offense_chart_mapping(df_combined["Offense Type"].tolist())
+    df_combined["Simplified Offense Type"] = df_combined["Offense Type"].map(
+        offense_mapping
+    )
 
     accidents_by_offense = (
         df_combined.groupby(["year", "Simplified Offense Type", "Offense Type"])

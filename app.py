@@ -17,9 +17,16 @@ from scripts.model import AccidentModel
 from scripts.summary_report import generate_summary_report
 from scripts.db import init_db
 from scripts.seed_database import seed_database
-from scripts.cache import warm_dashboard_cache, get_dashboard_html, get_barangay_list_cached
+from scripts.cache import (
+    warm_dashboard_cache,
+    warm_insights_cache,
+    get_dashboard_html,
+    get_barangay_list_cached,
+    get_city_insights_cached,
+)
 from scripts.rag import RagUnavailable, answer_question
 from scripts.build_rag_corpus import build_rag_corpus
+from scripts.dashboard_insights import barangay_insight_card
 
 _log_level = os.environ.get("LOG_LEVEL", "INFO").upper()
 logging.basicConfig(
@@ -84,6 +91,7 @@ def _initialize_app():
     accident_model.load_model()
     accident_model.precompute_city_hour_averages()
     warm_dashboard_cache()
+    warm_insights_cache(accident_model)
     logging.info("RideSafe startup complete.")
 
 
@@ -171,6 +179,43 @@ def get_barangay_list():
     except Exception:
         logging.exception("Error in get_barangay_list")
         return jsonify({"error": "Unable to generate barangay list."}), 500
+
+
+@app.route("/api/dashboard/insights", methods=["GET"])
+@limiter.limit("30 per minute")
+def api_dashboard_insights():
+    try:
+        data = get_city_insights_cached(accident_model)
+        if data is None:
+            warm_insights_cache(accident_model)
+            data = get_city_insights_cached(accident_model)
+        return jsonify(data)
+    except Exception:
+        logging.exception("Error in api_dashboard_insights")
+        return jsonify({"error": "Unable to load city insights."}), 500
+
+
+@app.route("/api/dashboard/barangay-insight/<barangay>", methods=["GET"])
+@limiter.limit("30 per minute")
+def api_barangay_insight(barangay):
+    try:
+        selected_hour = request.args.get("hour")
+        if selected_hour is not None:
+            try:
+                selected_hour = int(str(selected_hour).split(":")[0])
+            except (ValueError, IndexError):
+                return jsonify({"error": "Invalid hour query parameter."}), 400
+        card = barangay_insight_card(
+            barangay,
+            accident_model,
+            selected_hour=selected_hour,
+        )
+        return jsonify(card)
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    except Exception:
+        logging.exception("Error in api_barangay_insight")
+        return jsonify({"error": "Unable to load barangay insight."}), 500
 
 
 def _wkhtmltopdf_config():

@@ -2,10 +2,12 @@ document.addEventListener("DOMContentLoaded", () => {
   const VIEW_TITLES = {
     overview: "Overview",
     offense: "Offense Analytics",
-    map: "Map & Predictions",
+    heatmap: "Geospatial Heatmap",
+    predict: "Predictions",
     ask: "Ask RideSafe",
   };
   const VALID_VIEWS = Object.keys(VIEW_TITLES);
+  const VIEW_ALIASES = { map: "heatmap" };
 
   const searchResult = document.getElementById("search-result");
   const reportBtn = document.getElementById("report-btn");
@@ -31,11 +33,11 @@ document.addEventListener("DOMContentLoaded", () => {
   function notifyVizResize() {
     window.dispatchEvent(new Event("resize"));
     if (typeof Plotly !== "undefined") {
-      document
-        .querySelectorAll(
-          "#view-offense:not([hidden]) #bar-graph .plotly-graph-div, #view-overview:not([hidden]) .donut-chart.active .plotly-graph-div",
-        )
-        .forEach((el) => {
+    document
+      .querySelectorAll(
+        "#view-offense:not([hidden]) #bar-graph .plotly-graph-div, #view-overview:not([hidden]) .donut-chart.active .plotly-graph-div, #view-predict:not([hidden]) #hour-risk-chart .plotly-graph-div, #hour-risk-chart.js-plotly-plot",
+      )
+      .forEach((el) => {
           try {
             Plotly.Plots.resize(el);
           } catch {
@@ -119,11 +121,17 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function viewFromLocation() {
     const params = new URLSearchParams(window.location.search);
-    const fromQuery = params.get("view");
+    let fromQuery = params.get("view");
+    if (fromQuery && VIEW_ALIASES[fromQuery]) {
+      fromQuery = VIEW_ALIASES[fromQuery];
+    }
     if (fromQuery && VALID_VIEWS.includes(fromQuery)) {
       return fromQuery;
     }
-    const hash = (window.location.hash || "").replace(/^#/, "");
+    let hash = (window.location.hash || "").replace(/^#/, "");
+    if (VIEW_ALIASES[hash]) {
+      hash = VIEW_ALIASES[hash];
+    }
     if (hash && VALID_VIEWS.includes(hash)) {
       return hash;
     }
@@ -256,6 +264,7 @@ document.addEventListener("DOMContentLoaded", () => {
     defaultMonthLi.classList.add("is-selected");
   }
   fetchMonthData(2022, "JAN");
+  loadCityInsights();
 
   const barangay = document.getElementById("brgy");
   const searchBox = document.getElementById("search-box");
@@ -266,6 +275,275 @@ document.addEventListener("DOMContentLoaded", () => {
   const barangayText = document.getElementById("brgy-value");
   const hourText = document.getElementById("hr-value");
   const percentageText = document.getElementById("percent-result");
+  const insightPanel = document.getElementById("barangay-insight");
+  const insightShare = document.getElementById("insight-share");
+  const insightPeak = document.getElementById("insight-peak");
+  const insightLowest = document.getElementById("insight-lowest");
+  const insightQuarter = document.getElementById("insight-quarter");
+  const insightIncidents = document.getElementById("insight-incidents");
+  const insightRecs = document.getElementById("insight-recs");
+
+  function fillRankList(listEl, rows, formatter) {
+    if (!listEl) {
+      return;
+    }
+    listEl.innerHTML = "";
+    if (!rows || !rows.length) {
+      const li = document.createElement("li");
+      li.className = "rank-list__empty";
+      li.textContent = "No data available.";
+      listEl.appendChild(li);
+      return;
+    }
+    rows.forEach((row, index) => {
+      const li = document.createElement("li");
+      const rank = document.createElement("span");
+      rank.className = "rank-list__n";
+      rank.textContent = String(index + 1);
+      const body = document.createElement("div");
+      body.className = "rank-list__body";
+      const name = document.createElement("strong");
+      name.textContent = row.barangay || "";
+      const meta = document.createElement("span");
+      meta.textContent = formatter(row);
+      body.appendChild(name);
+      body.appendChild(meta);
+      li.appendChild(rank);
+      li.appendChild(body);
+      listEl.appendChild(li);
+    });
+  }
+
+  function renderHourRiskChart(hourRisk) {
+    const el = document.getElementById("hour-risk-chart");
+    if (!el || !hourRisk || !hourRisk.length) {
+      return;
+    }
+    const draw = () => {
+      if (typeof Plotly === "undefined") {
+        return;
+      }
+      const hours = hourRisk.map((row) => `${String(row.hour).padStart(2, "0")}:00`);
+      const values = hourRisk.map((row) => row.avg_risk_percent);
+      Plotly.newPlot(
+        el,
+        [
+          {
+            type: "bar",
+            x: hours,
+            y: values,
+            marker: {
+              color: values.map((v) =>
+                v >= 55 ? "#2dd4bf" : v >= 40 ? "#5eead4" : "#1e3a5f",
+              ),
+            },
+            hovertemplate: "%{x}<br>Avg risk: %{y:.2f}%<extra></extra>",
+          },
+        ],
+        {
+          paper_bgcolor: "rgba(0,0,0,0)",
+          plot_bgcolor: "rgba(0,0,0,0)",
+          margin: { l: 40, r: 12, t: 12, b: 48 },
+          height: 280,
+          font: { color: "#94a3b8", family: "DM Sans, sans-serif" },
+          xaxis: {
+            tickangle: -45,
+            dtick: 2,
+            gridcolor: "rgba(124,205,244,0.08)",
+            zeroline: false,
+          },
+          yaxis: {
+            title: { text: "%", font: { size: 11 } },
+            gridcolor: "rgba(124,205,244,0.08)",
+            zeroline: false,
+          },
+        },
+        { responsive: true, displayModeBar: false },
+      );
+    };
+    if (typeof Plotly === "undefined") {
+      setTimeout(draw, 400);
+    } else {
+      draw();
+    }
+  }
+
+  function renderOffenseGuide(guide) {
+    const intro = document.getElementById("offense-intro");
+    const legal = document.getElementById("offense-legal");
+    const topCallout = document.getElementById("offense-top");
+    const list = document.getElementById("offense-glossary-list");
+    if (!guide) {
+      return;
+    }
+    if (intro && guide.intro) {
+      intro.textContent = guide.intro;
+    }
+    if (legal && guide.legal_context) {
+      legal.textContent = guide.legal_context;
+    }
+    if (topCallout) {
+      if (guide.top_offense) {
+        const top = guide.top_offense;
+        topCallout.hidden = false;
+        topCallout.textContent = `Largest category overall: ${top.chart_label} — ${top.short_label} (${Number(top.total_count).toLocaleString()} incidents).`;
+      } else {
+        topCallout.hidden = true;
+      }
+    }
+    if (!list) {
+      return;
+    }
+    list.innerHTML = "";
+    (guide.items || []).forEach((item) => {
+      const article = document.createElement("article");
+      article.className = "offense-card";
+      article.innerHTML = `
+        <header class="offense-card__head">
+          <span class="offense-card__badge">${item.chart_label}</span>
+          <h3>${item.short_label}</h3>
+        </header>
+        <p class="offense-card__full">${item.offense_type}</p>
+        <p class="offense-card__meta"><strong>Legal basis:</strong> ${item.legal_basis}</p>
+        <p><strong>Meaning:</strong> ${item.meaning}</p>
+        <p class="offense-card__insight"><strong>Insight:</strong> ${item.insight}</p>
+        <p class="offense-card__counts">
+          Totals — 2022: ${Number(item.by_year["2022"] || 0).toLocaleString()},
+          2023: ${Number(item.by_year["2023"] || 0).toLocaleString()},
+          2024: ${Number(item.by_year["2024"] || 0).toLocaleString()}
+          (all years: ${Number(item.total_count || 0).toLocaleString()})
+        </p>
+      `;
+      list.appendChild(article);
+    });
+  }
+
+  async function loadCityInsights() {
+    try {
+      const res = await fetch(api("/api/dashboard/insights"));
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || res.statusText);
+      }
+      const kpis = data.city_kpis || {};
+      const totalEl = document.getElementById("city-total-incidents");
+      const yoyEl = document.getElementById("city-yoy");
+      const peakEl = document.getElementById("city-peak-hour");
+      const calmEl = document.getElementById("city-calm-hour");
+      const peakHint = document.getElementById("city-peak-hour-hint");
+      const calmHint = document.getElementById("city-calm-hour-hint");
+
+      if (totalEl) {
+        totalEl.textContent = Number(kpis.total_incidents || 0).toLocaleString();
+      }
+      if (yoyEl) {
+        const yoy = kpis.yoy_change_percent;
+        if (yoy == null) {
+          yoyEl.textContent = "n/a";
+        } else {
+          const sign = yoy > 0 ? "+" : "";
+          yoyEl.textContent = `${sign}${yoy}%`;
+          yoyEl.classList.toggle("kpi-up", yoy > 0);
+          yoyEl.classList.toggle("kpi-down", yoy < 0);
+        }
+      }
+      if (peakEl && kpis.peak_city_hour) {
+        peakEl.textContent = `${String(kpis.peak_city_hour.hour).padStart(2, "0")}:00`;
+        if (peakHint) {
+          peakHint.textContent = `Avg risk ${kpis.peak_city_hour.avg_risk_percent}%`;
+        }
+      }
+      if (calmEl && kpis.calm_city_hour) {
+        calmEl.textContent = `${String(kpis.calm_city_hour.hour).padStart(2, "0")}:00`;
+        if (calmHint) {
+          calmHint.textContent = `Avg risk ${kpis.calm_city_hour.avg_risk_percent}%`;
+        }
+      }
+
+      fillRankList(
+        document.getElementById("hotspot-list"),
+        data.hotspots,
+        (row) => `${Number(row.incident_count).toLocaleString()} incidents`,
+      );
+      fillRankList(
+        document.getElementById("safest-list"),
+        data.safest_by_volume,
+        (row) => `${Number(row.incident_count).toLocaleString()} incidents`,
+      );
+      fillRankList(
+        document.getElementById("peak-high-list"),
+        data.highest_peak_risk,
+        (row) =>
+          `${row.peak_predicted_risk_percent}% at ${String(row.peak_hour).padStart(2, "0")}:00 (${row.risk_label})`,
+      );
+      fillRankList(
+        document.getElementById("peak-low-list"),
+        data.lowest_peak_risk,
+        (row) =>
+          `${row.peak_predicted_risk_percent}% at ${String(row.peak_hour).padStart(2, "0")}:00 (${row.risk_label})`,
+      );
+      renderHourRiskChart(data.hour_risk || []);
+      renderOffenseGuide(data.offense_guide);
+    } catch (error) {
+      console.error("Error loading city insights: ", error);
+    }
+  }
+
+  function hideBarangayInsight() {
+    if (insightPanel) {
+      insightPanel.hidden = true;
+    }
+  }
+
+  function renderBarangayInsight(card) {
+    if (!insightPanel || !card) {
+      return;
+    }
+    if (insightShare) {
+      insightShare.textContent = `${card.share_percent}% of city incidents (${Number(card.total_incidents).toLocaleString()} of ${Number(card.city_total).toLocaleString()})`;
+    }
+    if (insightPeak) {
+      insightPeak.textContent = `${card.peak_hour}:00 · ${card.peak_percent}% (${card.peak_risk})`;
+    }
+    if (insightLowest) {
+      insightLowest.textContent = `${card.lowest_hour}:00 · ${card.lowest_percent}% (${card.lowest_risk})`;
+    }
+    if (insightQuarter) {
+      insightQuarter.textContent = card.peak_quarter || "n/a";
+    }
+    if (insightIncidents) {
+      insightIncidents.textContent = Number(card.total_incidents || 0).toLocaleString();
+    }
+    if (insightRecs) {
+      insightRecs.innerHTML = "";
+      (card.recommendations || []).forEach((text) => {
+        const li = document.createElement("li");
+        li.textContent = text;
+        insightRecs.appendChild(li);
+      });
+    }
+    insightPanel.hidden = false;
+  }
+
+  async function fetchBarangayInsight(barangayName, hourValue) {
+    try {
+      const hourPart = hourValue ? hourValue.split(":")[0] : "";
+      const url = api(
+        `/api/dashboard/barangay-insight/${encodeURIComponent(barangayName)}${
+          hourPart !== "" ? `?hour=${encodeURIComponent(hourPart)}` : ""
+        }`,
+      );
+      const res = await fetch(url);
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || res.statusText);
+      }
+      renderBarangayInsight(data);
+    } catch (error) {
+      console.error("Error loading barangay insight: ", error);
+      hideBarangayInsight();
+    }
+  }
 
   let barangayListCache = null;
   let lastReportBarangay = null;
@@ -472,6 +750,7 @@ document.addEventListener("DOMContentLoaded", () => {
         lastReportBarangay = null;
         lastReportHour = null;
         updateReportButtonState();
+        hideBarangayInsight();
         return;
       }
       percentageText.textContent =
@@ -479,6 +758,7 @@ document.addEventListener("DOMContentLoaded", () => {
       lastReportBarangay = barangayValue.toUpperCase();
       lastReportHour = hourValue;
       updateReportButtonState();
+      fetchBarangayInsight(barangayValue.toUpperCase(), hourValue);
     } catch (error) {
       console.error("Error fetching accident percentage: ", error);
     }
