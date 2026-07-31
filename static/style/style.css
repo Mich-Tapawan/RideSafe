@@ -17,6 +17,19 @@
   --font-display: "Fraunces", Georgia, serif;
   --space: clamp(1rem, 3vw, 2rem);
   --max-content: 1400px;
+  --scrollbar-size: 10px;
+  --scrollbar-track: rgba(7, 11, 18, 0.85);
+  --scrollbar-thumb: linear-gradient(
+    180deg,
+    rgba(94, 234, 212, 0.7),
+    rgba(45, 212, 191, 0.4)
+  );
+  --scrollbar-thumb-hover: linear-gradient(
+    180deg,
+    var(--accent),
+    var(--accent-strong)
+  );
+  --scrollbar-border: rgba(124, 205, 244, 0.12);
 }
 
 *,
@@ -27,6 +40,41 @@
 
 html {
   scroll-behavior: smooth;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(94, 234, 212, 0.55) var(--scrollbar-track);
+}
+
+/* Themed scrollbars (Firefox uses scrollbar-* above; WebKit below) */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(94, 234, 212, 0.55) var(--scrollbar-track);
+}
+
+*::-webkit-scrollbar {
+  width: var(--scrollbar-size);
+  height: var(--scrollbar-size);
+}
+
+*::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+  border-radius: 999px;
+  border: 1px solid var(--scrollbar-border);
+}
+
+*::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+  background-clip: padding-box;
+}
+
+*::-webkit-scrollbar-corner {
+  background: transparent;
 }
 
 body {
@@ -1137,43 +1185,6 @@ button.nav-btn {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(94, 234, 212, 0.55) rgba(12, 17, 27, 0.65);
-}
-
-.chat-messages::-webkit-scrollbar {
-  width: 8px;
-}
-
-.chat-messages::-webkit-scrollbar-track {
-  margin: 0.35rem 0;
-  background: rgba(12, 17, 27, 0.55);
-  border-radius: 999px;
-  border: 1px solid var(--border-subtle);
-}
-
-.chat-messages::-webkit-scrollbar-thumb {
-  background: linear-gradient(
-    180deg,
-    rgba(94, 234, 212, 0.75),
-    rgba(45, 212, 191, 0.45)
-  );
-  border-radius: 999px;
-  border: 2px solid transparent;
-  background-clip: padding-box;
-}
-
-.chat-messages::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(
-    180deg,
-    var(--accent),
-    var(--accent-strong)
-  );
-  background-clip: padding-box;
-}
-
-.chat-messages::-webkit-scrollbar-corner {
-  background: transparent;
 }
 
 .chat-bubble {
