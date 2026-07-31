@@ -250,6 +250,13 @@ document.addEventListener("DOMContentLoaded", () => {
     monthBtns.appendChild(li);
   });
 
+  // Default executive KPIs: January 2022 on first load
+  const defaultMonthLi = monthBtns?.querySelector("li");
+  if (defaultMonthLi) {
+    defaultMonthLi.classList.add("is-selected");
+  }
+  fetchMonthData(2022, "JAN");
+
   const barangay = document.getElementById("brgy");
   const searchBox = document.getElementById("search-box");
   const resultBox = document.querySelector(".result-box");
