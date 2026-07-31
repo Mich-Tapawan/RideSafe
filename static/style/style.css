@@ -903,8 +903,7 @@ body.dashboard-app {
   }
 }
 
-.map-layout,
-.heatmap-layout {
+.map-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(260px, 340px);
   gap: 1rem;
@@ -912,33 +911,65 @@ body.dashboard-app {
   min-height: min(70vh, 640px);
 }
 
-.map-layout #heat-map,
-.heatmap-layout #heat-map {
+.map-layout #heat-map {
   min-height: 420px;
   height: 100%;
 }
 
-.map-side,
-.heatmap-side {
+.map-side {
   display: flex;
   flex-direction: column;
   gap: 0.85rem;
   min-width: 0;
 }
 
-.predict-layout {
-  display: grid;
-  grid-template-columns: minmax(0, 1.4fr) minmax(260px, 340px);
+/* Heatmap: full-width map on top, ranking lists in a row below */
+.heatmap-layout {
+  display: flex;
+  flex-direction: column;
   gap: 1rem;
+  min-width: 0;
+}
+
+.heatmap-layout #heat-map {
+  width: 100%;
+  min-height: min(58vh, 560px);
+  height: min(58vh, 560px);
+}
+
+.heatmap-side {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.85rem;
+  min-width: 0;
   align-items: start;
 }
 
-.predict-main,
-.predict-side {
+.predict-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.predict-main {
   display: flex;
   flex-direction: column;
   gap: 0.85rem;
   min-width: 0;
+  width: 100%;
+}
+
+.predict-side {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.85rem;
+  min-width: 0;
+  align-items: start;
+}
+
+.predict-main .overview-card--hour-risk {
+  width: 100%;
 }
 
 .map-layout .search-result {
@@ -1003,16 +1034,23 @@ body.dashboard-app {
 }
 
 @media (max-width: 960px) {
-  .map-layout,
-  .heatmap-layout,
-  .predict-layout {
+  .map-layout {
     grid-template-columns: 1fr;
     min-height: 0;
   }
 
-  .map-layout #heat-map,
+  .map-layout #heat-map {
+    min-height: 360px;
+  }
+
   .heatmap-layout #heat-map {
     min-height: 360px;
+    height: min(50vh, 420px);
+  }
+
+  .heatmap-side,
+  .predict-side {
+    grid-template-columns: 1fr;
   }
 }
 
