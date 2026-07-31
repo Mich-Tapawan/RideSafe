@@ -1,7 +1,10 @@
 <header class="chat-intro">
   <div class="chat-intro__row">
     <div>
-      <h1 id="ask-heading">Ask RideSafe</h1>
+      <h1 id="ask-heading">
+        <i data-lucide="message-circle" aria-hidden="true"></i>
+        Ask RideSafe
+      </h1>
       <p>
         Ask about Imus traffic trends, barangay risk, and how to use the
         dashboard. Guest users: 3 questions per hour. Admin mode unlocks
@@ -9,7 +12,8 @@
       </p>
     </div>
     <p id="chat-quota" class="chat-quota" aria-live="polite">
-      Guest · 3 questions / hour
+      <i data-lucide="ticket" aria-hidden="true"></i>
+      <span>Guest · 3 questions / hour</span>
     </p>
   </div>
 </header>
@@ -35,6 +39,7 @@
       required
     ></textarea>
     <button type="submit" id="chat-send" class="btn btn--accent">
+      <i data-lucide="send" aria-hidden="true"></i>
       Send
     </button>
   </form>

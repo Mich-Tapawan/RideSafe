@@ -1,0 +1,12 @@
+{
+  "name": "ridesafe",
+  "version": "1.0.0",
+  "private": true,
+  "description": "RideSafe dashboard frontend assets (Lucide icons)",
+  "scripts": {
+    "vendor:lucide": "node -e \"require('fs').copyFileSync('node_modules/lucide/dist/umd/lucide.min.js','static/vendor/lucide.min.js')\""
+  },
+  "dependencies": {
+    "lucide": "^0.563.0"
+  }
+}

@@ -6,8 +6,26 @@ document.addEventListener("DOMContentLoaded", () => {
     predict: "Predictions",
     ask: "Ask RideSafe",
   };
+  const VIEW_ICONS = {
+    overview: "layout-dashboard",
+    offense: "bar-chart-3",
+    heatmap: "map",
+    predict: "activity",
+    ask: "message-circle",
+  };
   const VALID_VIEWS = Object.keys(VIEW_TITLES);
   const VIEW_ALIASES = { map: "heatmap" };
+
+  function refreshIcons() {
+    if (typeof lucide === "undefined" || typeof lucide.createIcons !== "function") {
+      return;
+    }
+    lucide.createIcons({
+      attrs: {
+        "stroke-width": 1.75,
+      },
+    });
+  }
 
   const searchResult = document.getElementById("search-result");
   const reportBtn = document.getElementById("report-btn");
@@ -105,7 +123,9 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     if (viewTitle) {
-      viewTitle.textContent = VIEW_TITLES[view];
+      const iconName = VIEW_ICONS[view] || "layout-dashboard";
+      viewTitle.innerHTML = `<i data-lucide="${iconName}" class="title-icon" aria-hidden="true"></i><span>${VIEW_TITLES[view]}</span>`;
+      refreshIcons();
     }
 
     if (updateHistory) {
@@ -116,7 +136,10 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     closeMobileSidebar();
-    requestAnimationFrame(() => notifyVizResize());
+    requestAnimationFrame(() => {
+      notifyVizResize();
+      refreshIcons();
+    });
   }
 
   function viewFromLocation() {
@@ -401,7 +424,7 @@ document.addEventListener("DOMContentLoaded", () => {
       article.innerHTML = `
         <header class="offense-card__head">
           <span class="offense-card__badge">${item.chart_label}</span>
-          <h3>${item.short_label}</h3>
+          <h3><i data-lucide="scale" aria-hidden="true"></i> ${item.short_label}</h3>
         </header>
         <p class="offense-card__full">${item.offense_type}</p>
         <p class="offense-card__meta"><strong>Legal basis:</strong> ${item.legal_basis}</p>
@@ -416,6 +439,7 @@ document.addEventListener("DOMContentLoaded", () => {
       `;
       list.appendChild(article);
     });
+    refreshIcons();
   }
 
   async function loadCityInsights() {
@@ -484,6 +508,7 @@ document.addEventListener("DOMContentLoaded", () => {
       );
       renderHourRiskChart(data.hour_risk || []);
       renderOffenseGuide(data.offense_guide);
+      refreshIcons();
     } catch (error) {
       console.error("Error loading city insights: ", error);
     }
@@ -523,6 +548,7 @@ document.addEventListener("DOMContentLoaded", () => {
       });
     }
     insightPanel.hidden = false;
+    refreshIcons();
   }
 
   async function fetchBarangayInsight(barangayName, hourValue) {
@@ -778,4 +804,6 @@ document.addEventListener("DOMContentLoaded", () => {
       return [];
     }
   }
+
+  refreshIcons();
 });

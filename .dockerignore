@@ -14,3 +14,5 @@ terminals/
 summary_report.pdf
 ~$*.xlsx
 .data/
+
+node_modules/

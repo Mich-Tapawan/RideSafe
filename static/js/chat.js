@@ -64,22 +64,28 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!quotaEl || !adminBtn) {
       return;
     }
+    const label = quotaEl.querySelector("span") || quotaEl;
     if (isAdmin) {
-      quotaEl.textContent = "Admin · unlimited questions";
+      label.textContent = "Admin · unlimited questions";
       quotaEl.classList.add("chat-quota--admin");
-      adminBtn.textContent = "Admin ✓";
+      adminBtn.innerHTML =
+        '<i data-lucide="shield-check" aria-hidden="true"></i><span>Admin ✓</span>';
       adminBtn.classList.add("is-active");
       if (adminLogoutBtn) {
         adminLogoutBtn.hidden = false;
       }
     } else {
-      quotaEl.textContent = "Guest · 3 questions / hour";
+      label.textContent = "Guest · 3 questions / hour";
       quotaEl.classList.remove("chat-quota--admin");
-      adminBtn.textContent = "Admin";
+      adminBtn.innerHTML =
+        '<i data-lucide="shield" aria-hidden="true"></i><span>Admin</span>';
       adminBtn.classList.remove("is-active");
       if (adminLogoutBtn) {
         adminLogoutBtn.hidden = true;
       }
+    }
+    if (typeof lucide !== "undefined" && typeof lucide.createIcons === "function") {
+      lucide.createIcons({ attrs: { "stroke-width": 1.75 } });
     }
   }
 

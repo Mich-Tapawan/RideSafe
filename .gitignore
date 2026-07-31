@@ -7,3 +7,4 @@ summary_report.pdf
 ~$*.xlsx
 .data/
 .cursor/
+node_modules/

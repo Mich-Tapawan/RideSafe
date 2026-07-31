@@ -48,19 +48,24 @@
             data-nav="overview"
             aria-current="page"
           >
-            Overview
+            <i data-lucide="layout-dashboard" aria-hidden="true"></i>
+            <span>Overview</span>
           </button>
           <button type="button" class="sidebar-link" data-nav="offense">
-            Offense Analytics
+            <i data-lucide="bar-chart-3" aria-hidden="true"></i>
+            <span>Offense Analytics</span>
           </button>
           <button type="button" class="sidebar-link" data-nav="heatmap">
-            Geospatial Heatmap
+            <i data-lucide="map" aria-hidden="true"></i>
+            <span>Geospatial Heatmap</span>
           </button>
           <button type="button" class="sidebar-link" data-nav="predict">
-            Predictions
+            <i data-lucide="activity" aria-hidden="true"></i>
+            <span>Predictions</span>
           </button>
           <button type="button" class="sidebar-link" data-nav="ask">
-            Ask RideSafe
+            <i data-lucide="message-circle" aria-hidden="true"></i>
+            <span>Ask RideSafe</span>
           </button>
         </nav>
 
@@ -71,7 +76,8 @@
             class="sidebar-link sidebar-link--admin"
             aria-haspopup="dialog"
           >
-            Admin
+            <i data-lucide="shield" aria-hidden="true"></i>
+            <span>Admin</span>
           </button>
         </div>
       </aside>
@@ -90,7 +96,10 @@
             <span class="sidebar-toggle__bar" aria-hidden="true"></span>
             <span class="sidebar-toggle__bar" aria-hidden="true"></span>
           </button>
-          <h2 id="view-title" class="dashboard-topbar__title">Overview</h2>
+          <h2 id="view-title" class="dashboard-topbar__title">
+            <i data-lucide="layout-dashboard" class="title-icon" aria-hidden="true"></i>
+            <span>Overview</span>
+          </h2>
         </header>
 
         <main id="main-content" class="content-viewport">
@@ -103,7 +112,10 @@
             <div class="overview-layout">
               <header class="overview-hero">
                 <div class="overview-hero__copy">
-                  <p class="overview-kicker">Executive summary</p>
+                  <p class="overview-kicker">
+                    <i data-lucide="sparkles" aria-hidden="true"></i>
+                    Executive summary
+                  </p>
                   <h1 id="overview-heading">Imus City incident overview</h1>
                   <p>
                     Quarterly distribution and monthly totals from the traffic
@@ -147,17 +159,26 @@
 
               <div class="overview-kpis" aria-live="polite">
                 <article class="kpi-card">
-                  <h4>Selected month</h4>
+                  <h4>
+                    <i data-lucide="calendar" aria-hidden="true"></i>
+                    Selected month
+                  </h4>
                   <p id="month-value">JAN</p>
                   <span class="kpi-card__hint">Click a month to load</span>
                 </article>
                 <article class="kpi-card">
-                  <h4>Incidents</h4>
+                  <h4>
+                    <i data-lucide="car-front" aria-hidden="true"></i>
+                    Incidents
+                  </h4>
                   <p id="total-value">…</p>
                   <span class="kpi-card__hint">Count in selected month</span>
                 </article>
                 <article class="kpi-card">
-                  <h4>Share of year</h4>
+                  <h4>
+                    <i data-lucide="percent" aria-hidden="true"></i>
+                    Share of year
+                  </h4>
                   <p id="percentage-value">…</p>
                   <span class="kpi-card__hint">Of annual total</span>
                 </article>
@@ -166,7 +187,10 @@
               <div class="overview-grid">
                 <section class="overview-card overview-card--chart" aria-label="Quarterly mix">
                   <header class="overview-card__head">
-                    <h2>Quarterly mix</h2>
+                    <h2>
+                      <i data-lucide="pie-chart" aria-hidden="true"></i>
+                      Quarterly mix
+                    </h2>
                     <p>Offense volume by quarter for the selected year</p>
                   </header>
                   <div class="donut-stage">
@@ -184,7 +208,10 @@
 
                 <section class="overview-card overview-card--months" aria-label="Monthly breakdown">
                   <header class="overview-card__head">
-                    <h2>Monthly breakdown</h2>
+                    <h2>
+                      <i data-lucide="calendar-days" aria-hidden="true"></i>
+                      Monthly breakdown
+                    </h2>
                     <p>Select a month to update the KPI strip</p>
                   </header>
                   <ul id="month-btns" class="month-grid" aria-label="Months"></ul>
@@ -193,24 +220,36 @@
 
               <div class="overview-city-kpis" id="city-kpis" aria-live="polite">
                 <article class="kpi-card">
-                  <h4>City total incidents</h4>
+                  <h4>
+                    <i data-lucide="database" aria-hidden="true"></i>
+                    City total incidents
+                  </h4>
                   <p id="city-total-incidents">…</p>
                   <span class="kpi-card__hint">2022 – Nov 2024</span>
                 </article>
                 <article class="kpi-card">
-                  <h4>YoY change</h4>
+                  <h4>
+                    <i data-lucide="trending-up" aria-hidden="true"></i>
+                    YoY change
+                  </h4>
                   <p id="city-yoy">…</p>
                   <span class="kpi-card__hint">2024 vs 2023 yearly totals</span>
                 </article>
                 <article class="kpi-card">
-                  <h4>Riskiest city hour</h4>
+                  <h4>
+                    <i data-lucide="flame" aria-hidden="true"></i>
+                    Riskiest city hour
+                  </h4>
                   <p id="city-peak-hour">…</p>
                   <span class="kpi-card__hint" id="city-peak-hour-hint"
                     >Avg predicted risk</span
                   >
                 </article>
                 <article class="kpi-card">
-                  <h4>Calmest city hour</h4>
+                  <h4>
+                    <i data-lucide="moon" aria-hidden="true"></i>
+                    Calmest city hour
+                  </h4>
                   <p id="city-calm-hour">…</p>
                   <span class="kpi-card__hint" id="city-calm-hour-hint"
                     >Avg predicted risk</span
@@ -228,7 +267,10 @@
             aria-labelledby="offense-heading"
           >
             <header class="view-header">
-              <h1 id="offense-heading">Offense Analytics</h1>
+              <h1 id="offense-heading">
+                <i data-lucide="bar-chart-3" aria-hidden="true"></i>
+                Offense Analytics
+              </h1>
               <p id="offense-intro">
                 Accident counts by offense type across 2022–2024.
               </p>
@@ -237,7 +279,10 @@
             <p id="offense-top" class="offense-top-callout" hidden></p>
             <div class="bar-graph card-viz" id="bar-graph">
               <div class="header">
-                <h1>Accidents over the years</h1>
+                <h1>
+                  <i data-lucide="chart-column" aria-hidden="true"></i>
+                  Accidents over the years
+                </h1>
                 <p>2022 through November 18, 2024</p>
               </div>
               <div class="plotly-wrap">{{ bar_graph|safe }}</div>
@@ -247,7 +292,10 @@
               aria-labelledby="offense-glossary-heading"
             >
               <header class="overview-card__head">
-                <h2 id="offense-glossary-heading">Offense glossary</h2>
+                <h2 id="offense-glossary-heading">
+                  <i data-lucide="book-open" aria-hidden="true"></i>
+                  Offense glossary
+                </h2>
                 <p>
                   Meanings for each chart label (Offense 1–N), with legal context
                   and data insights
@@ -265,7 +313,10 @@
             aria-labelledby="heatmap-heading"
           >
             <header class="view-header">
-              <h1 id="heatmap-heading">Geospatial Heatmap</h1>
+              <h1 id="heatmap-heading">
+                <i data-lucide="map" aria-hidden="true"></i>
+                Geospatial Heatmap
+              </h1>
               <p>
                 Choropleth of Imus barangays with historical hotspot and
                 low-volume rankings.
@@ -279,14 +330,20 @@
               <div class="heatmap-side">
                 <section class="overview-card" aria-labelledby="hotspots-heading">
                   <header class="overview-card__head">
-                    <h2 id="hotspots-heading">Hotspot barangays</h2>
+                    <h2 id="hotspots-heading">
+                      <i data-lucide="map-pin" aria-hidden="true"></i>
+                      Hotspot barangays
+                    </h2>
                     <p>Highest historical incident counts (2022–2024)</p>
                   </header>
                   <ol id="hotspot-list" class="rank-list"></ol>
                 </section>
                 <section class="overview-card" aria-labelledby="safest-heading">
                   <header class="overview-card__head">
-                    <h2 id="safest-heading">Lowest volume</h2>
+                    <h2 id="safest-heading">
+                      <i data-lucide="shield-check" aria-hidden="true"></i>
+                      Lowest volume
+                    </h2>
                     <p>Fewest recorded incidents by barangay</p>
                   </header>
                   <ol id="safest-list" class="rank-list"></ol>
@@ -303,7 +360,10 @@
             aria-labelledby="predict-heading"
           >
             <header class="view-header">
-              <h1 id="predict-heading">Predictions</h1>
+              <h1 id="predict-heading">
+                <i data-lucide="activity" aria-hidden="true"></i>
+                Predictions
+              </h1>
               <p>
                 Run barangay-hour risk predictions and explore ML peak-risk
                 rankings and the citywide hour curve.
@@ -338,12 +398,7 @@
                   class="btn btn--icon"
                   aria-label="Run prediction"
                 >
-                  <img
-                    src="{{ url_for('static', filename='assets/search.png') }}"
-                    alt=""
-                    width="22"
-                    height="22"
-                  />
+                  <i data-lucide="search" aria-hidden="true"></i>
                 </button>
               </div>
             </section>
@@ -369,6 +424,7 @@
                     aria-disabled="true"
                     title="Run a prediction first to download a report"
                   >
+                    <i data-lucide="file-down" aria-hidden="true"></i>
                     Download summary report (PDF)
                   </button>
                 </section>
@@ -380,24 +436,39 @@
                   aria-live="polite"
                 >
                   <header class="barangay-insight__head">
-                    <h3>Barangay insight</h3>
+                    <h3>
+                      <i data-lucide="lightbulb" aria-hidden="true"></i>
+                      Barangay insight
+                    </h3>
                     <p id="insight-share"></p>
                   </header>
                   <dl class="insight-stats">
                     <div>
-                      <dt>Peak risk hour</dt>
+                      <dt>
+                        <i data-lucide="flame" aria-hidden="true"></i>
+                        Peak risk hour
+                      </dt>
                       <dd id="insight-peak"></dd>
                     </div>
                     <div>
-                      <dt>Lowest risk hour</dt>
+                      <dt>
+                        <i data-lucide="moon" aria-hidden="true"></i>
+                        Lowest risk hour
+                      </dt>
                       <dd id="insight-lowest"></dd>
                     </div>
                     <div>
-                      <dt>Peak quarter</dt>
+                      <dt>
+                        <i data-lucide="calendar-range" aria-hidden="true"></i>
+                        Peak quarter
+                      </dt>
                       <dd id="insight-quarter"></dd>
                     </div>
                     <div>
-                      <dt>Incidents</dt>
+                      <dt>
+                        <i data-lucide="hash" aria-hidden="true"></i>
+                        Incidents
+                      </dt>
                       <dd id="insight-incidents"></dd>
                     </div>
                   </dl>
@@ -409,7 +480,10 @@
                   aria-labelledby="hour-risk-heading"
                 >
                   <header class="overview-card__head">
-                    <h2 id="hour-risk-heading">Citywide predicted risk by hour</h2>
+                    <h2 id="hour-risk-heading">
+                      <i data-lucide="clock" aria-hidden="true"></i>
+                      Citywide predicted risk by hour
+                    </h2>
                     <p>
                       Average ML risk across all barangays for each hour of the
                       day
@@ -422,14 +496,20 @@
               <div class="predict-side">
                 <section class="overview-card" aria-labelledby="peak-high-heading">
                   <header class="overview-card__head">
-                    <h2 id="peak-high-heading">Highest peak predicted risk</h2>
+                    <h2 id="peak-high-heading">
+                      <i data-lucide="alert-triangle" aria-hidden="true"></i>
+                      Highest peak predicted risk
+                    </h2>
                     <p>ML worst-hour risk by barangay</p>
                   </header>
                   <ol id="peak-high-list" class="rank-list"></ol>
                 </section>
                 <section class="overview-card" aria-labelledby="peak-low-heading">
                   <header class="overview-card__head">
-                    <h2 id="peak-low-heading">Lowest peak predicted risk</h2>
+                    <h2 id="peak-low-heading">
+                      <i data-lucide="check-circle-2" aria-hidden="true"></i>
+                      Lowest peak predicted risk
+                    </h2>
                     <p>ML calmest peak hours by barangay</p>
                   </header>
                   <ol id="peak-low-list" class="rank-list"></ol>
@@ -460,6 +540,7 @@
 
     {% include "partials/admin_modal.html" %}
 
+    <script src="{{ url_for('static', filename='vendor/lucide.min.js') }}"></script>
     <script src="{{ url_for('static', filename='js/index.js') }}"></script>
     <script src="{{ url_for('static', filename='js/chat.js') }}"></script>
   </body>

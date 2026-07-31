@@ -151,7 +151,9 @@ body.dashboard-app {
 
 .sidebar-link {
   appearance: none;
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
   width: 100%;
   text-align: left;
   border: 0;
@@ -166,6 +168,78 @@ body.dashboard-app {
   transition:
     color 0.15s ease,
     background 0.15s ease;
+}
+
+.sidebar-link svg,
+.kpi-card h4 svg,
+.overview-card__head h2 svg,
+.view-header h1 svg,
+.chat-intro h1 svg,
+.header h1 svg,
+.barangay-insight__head h3 svg,
+.offense-card__head h3 svg,
+.btn svg,
+.chat-quota svg,
+.overview-kicker svg,
+.dashboard-topbar__title svg,
+.modal__panel h2 svg,
+.insight-stats dt svg,
+.btn--link svg {
+  width: 1.05em;
+  height: 1.05em;
+  flex-shrink: 0;
+  stroke: currentColor;
+}
+
+.sidebar-link svg {
+  width: 1.15rem;
+  height: 1.15rem;
+  opacity: 0.9;
+}
+
+.kpi-card h4,
+.overview-card__head h2,
+.view-header h1,
+.chat-intro h1,
+.header h1,
+.barangay-insight__head h3,
+.offense-card__head h3,
+.dashboard-topbar__title,
+.modal__panel h2,
+.overview-kicker,
+.insight-stats dt,
+.btn--link,
+.btn--accent,
+.chat-quota {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+}
+
+.dashboard-topbar__title {
+  gap: 0.55rem;
+}
+
+.dashboard-topbar__title .title-icon {
+  width: 1.15rem;
+  height: 1.15rem;
+  color: var(--accent);
+}
+
+.btn--icon svg {
+  width: 1.25rem;
+  height: 1.25rem;
+  color: var(--accent);
+}
+
+.chat-quota {
+  gap: 0.35rem;
+}
+
+.chat-quota svg {
+  width: 0.9rem;
+  height: 0.9rem;
 }
 
 .sidebar-link:hover {
