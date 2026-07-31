@@ -18,8 +18,10 @@ RideSafe is a traffic safety platform that uses historical incident data (2022â€
 
 <div align="center">
   <img src="static/screenshots/dashboard.jpg" alt="Dashboard" width="400">
+   <img src="static/screenshots/offense.jpg" alt="offense" width="400">
   <img src="static/screenshots/heat-map.jpg" alt="Heatmap" width="400">
   <img src="static/screenshots/prediction.jpg" alt="Prediction" width="400">
+  <img src="static/screenshots/brgy-predict.jpg" alt="brgy-predict" width="400">
   <img src="static/screenshots/report.jpg" alt="Report" width="400">
    <img src="static/screenshots/chatbot.jpg" alt="chatbot" width="400">
 </div>
