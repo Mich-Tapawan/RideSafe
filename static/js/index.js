@@ -212,12 +212,14 @@ document.addEventListener("DOMContentLoaded", () => {
     if (yearValue) {
       yearValue.textContent = String(year);
     }
-    monthName.textContent = "—";
-    totalValue.textContent = "0";
-    percentage.textContent = "0%";
-    document.querySelectorAll(".month-grid li").forEach((li) => {
-      li.classList.remove("is-selected");
-    });
+
+    const monthItems = document.querySelectorAll(".month-grid li");
+    monthItems.forEach((li) => li.classList.remove("is-selected"));
+    const janLi = monthItems[0];
+    if (janLi) {
+      janLi.classList.add("is-selected");
+    }
+    fetchMonthData(year, "JAN");
 
     requestAnimationFrame(() => {
       notifyVizResize();
