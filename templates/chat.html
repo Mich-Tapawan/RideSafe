@@ -2,138 +2,15 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="refresh" content="0;url=/#ask" />
     <title>Ask RideSafe</title>
-    <link
-      rel="stylesheet"
-      href="{{ url_for('static', filename='style/style.css') }}"
-    />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400..700;1,9..40,400..700&family=Fraunces:ital,opsz,wght@0,9..144,500..800;1,9..144,500..800&display=swap"
-      rel="stylesheet"
-    />
-    <link
-      rel="icon"
-      type="image/svg+xml"
-      href="{{ url_for('static', filename='favicon.svg') }}"
-    />
+    <script>
+      location.replace("/#ask");
+    </script>
   </head>
   <body>
-    <a href="#main-content" class="skip-link">Skip to content</a>
-    <header class="site-header">
-      <nav class="nav" aria-label="Main">
-        <a
-          class="brand brand--link"
-          href="{{ url_for('home') }}"
-          aria-label="RideSafe dashboard"
-        >
-          <span class="brand-text">RideSafe</span>
-        </a>
-        <div class="nav-links">
-          <a class="nav-link" href="{{ url_for('home') }}">Dashboard</a>
-          <a class="nav-link nav-link--active" href="{{ url_for('chat_page') }}"
-            >Ask RideSafe</a
-          >
-          <button
-            type="button"
-            id="admin-mode-btn"
-            class="nav-link nav-btn"
-            aria-haspopup="dialog"
-          >
-            Admin
-          </button>
-        </div>
-      </nav>
-    </header>
-
-    <main id="main-content" class="main-container chat-page">
-      <header class="chat-intro">
-        <div class="chat-intro__row">
-          <div>
-            <h1>Ask RideSafe</h1>
-            <p>
-              Ask about Imus traffic trends, barangay risk, and how to use the
-              dashboard. Guest users: 3 questions per hour. Admin mode unlocks
-              unlimited questions.
-            </p>
-          </div>
-          <p id="chat-quota" class="chat-quota" aria-live="polite">
-            Guest · 3 questions / hour
-          </p>
-        </div>
-      </header>
-
-      <section class="chat-panel card-viz" aria-label="Chat">
-        <div
-          id="chat-messages"
-          class="chat-messages"
-          role="log"
-          aria-live="polite"
-        >
-          <!-- Populated by chat.js from sessionStorage -->
-        </div>
-
-        <form id="chat-form" class="chat-form">
-          <label class="visually-hidden" for="chat-input">Your question</label>
-          <textarea
-            id="chat-input"
-            name="message"
-            rows="2"
-            maxlength="1000"
-            placeholder="Ask about a barangay, hour, or citywide trend…"
-            required
-          ></textarea>
-          <button type="submit" id="chat-send" class="btn btn--accent">
-            Send
-          </button>
-        </form>
-        <p id="chat-status" class="chat-status" hidden></p>
-      </section>
-    </main>
-
-    <div
-      id="admin-modal"
-      class="modal"
-      hidden
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="admin-modal-title"
-    >
-      <div class="modal__backdrop" data-close-modal></div>
-      <div class="modal__panel card-viz">
-        <h2 id="admin-modal-title">Admin access</h2>
-        <p class="modal__hint">
-          Enter the admin password for unlimited chat questions this session.
-        </p>
-        <form id="admin-login-form" class="modal__form">
-          <label class="visually-hidden" for="admin-password">Password</label>
-          <input
-            id="admin-password"
-            type="password"
-            name="password"
-            autocomplete="current-password"
-            placeholder="Password"
-            required
-          />
-          <p id="admin-login-error" class="modal__error" hidden></p>
-          <div class="modal__actions">
-            <button type="button" class="btn" data-close-modal>Cancel</button>
-            <button type="submit" class="btn btn--accent">Unlock</button>
-          </div>
-        </form>
-        <button
-          type="button"
-          id="admin-logout-btn"
-          class="btn modal__logout"
-          hidden
-        >
-          Exit admin mode
-        </button>
-      </div>
-    </div>
-
-    <script src="{{ url_for('static', filename='js/chat.js') }}"></script>
+    <p>
+      <a href="/#ask">Continue to Ask RideSafe</a>
+    </p>
   </body>
 </html>

@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Imus Accident Dashboard</title>
+    <title>RideSafe — Imus Accident Dashboard</title>
     <link
       rel="stylesheet"
       href="{{ url_for('static', filename='style/style.css') }}"
@@ -14,164 +14,307 @@
       href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400..700;1,9..40,400..700&family=Fraunces:ital,opsz,wght@0,9..144,500..800;1,9..144,500..800&display=swap"
       rel="stylesheet"
     />
-    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
-    <link rel="alternate icon" href="{{ url_for('static', filename='favicon.ico') }}">
+    <link
+      rel="icon"
+      type="image/svg+xml"
+      href="{{ url_for('static', filename='favicon.svg') }}"
+    />
+    <link
+      rel="alternate icon"
+      href="{{ url_for('static', filename='favicon.ico') }}"
+    />
   </head>
 
-  <body>
+  <body class="dashboard-app">
     <a href="#main-content" class="skip-link">Skip to content</a>
-    <header class="site-header">
-      <nav class="nav" aria-label="Main">
-        <a
-          class="brand brand--link"
-          href="{{ url_for('home') }}"
-          aria-label="RideSafe dashboard"
-        >
-          <span class="brand-text">RideSafe</span>
-        </a>
-        <div class="nav-links">
-          <a class="nav-link nav-link--active" href="{{ url_for('home') }}"
-            >Dashboard</a
-          >
-          <a class="nav-link" href="{{ url_for('chat_page') }}">Ask RideSafe</a>
-        </div>
-      </nav>
-    </header>
 
-    <main id="main-content" class="main-container">
-      <div class="grid-container">
-        <div class="panel panel--primary">
-          <section class="toolbar" aria-label="Search and map toggle">
-            <button
-              type="button"
-              id="toggle-btn"
-              class="btn btn--accent"
-              data-view="bar"
-            >
-              View heat map
-            </button>
-            <div class="toolbar__search">
-              <div id="search-box" class="search-box">
-                <label class="visually-hidden" for="brgy">Barangay</label>
-                <input
-                  type="text"
-                  name="brgy"
-                  id="brgy"
-                  placeholder="Barangay in Imus City"
-                  autocomplete="off"
-                />
-                <div class="result-box" hidden>
-                  <ul role="listbox" aria-label="Barangay suggestions"></ul>
+    <div class="dashboard-shell">
+      <aside class="sidebar" id="app-sidebar" aria-label="Dashboard">
+        <div class="sidebar__brand">
+          <a
+            class="brand brand--link"
+            href="{{ url_for('home') }}#overview"
+            aria-label="RideSafe dashboard"
+          >
+            <span class="brand-text">RideSafe</span>
+          </a>
+          <p class="sidebar__tagline">Imus traffic intelligence</p>
+        </div>
+
+        <nav class="sidebar__nav" aria-label="Modules">
+          <button
+            type="button"
+            class="sidebar-link is-active"
+            data-nav="overview"
+            aria-current="page"
+          >
+            Overview
+          </button>
+          <button type="button" class="sidebar-link" data-nav="offense">
+            Offense Analytics
+          </button>
+          <button type="button" class="sidebar-link" data-nav="map">
+            Map &amp; Predictions
+          </button>
+          <button type="button" class="sidebar-link" data-nav="ask">
+            Ask RideSafe
+          </button>
+        </nav>
+
+        <div class="sidebar__footer">
+          <button
+            type="button"
+            id="admin-mode-btn"
+            class="sidebar-link sidebar-link--admin"
+            aria-haspopup="dialog"
+          >
+            Admin
+          </button>
+        </div>
+      </aside>
+
+      <div class="dashboard-main">
+        <header class="dashboard-topbar">
+          <button
+            type="button"
+            id="sidebar-toggle"
+            class="sidebar-toggle"
+            aria-controls="app-sidebar"
+            aria-expanded="false"
+            aria-label="Open navigation"
+          >
+            <span class="sidebar-toggle__bar" aria-hidden="true"></span>
+            <span class="sidebar-toggle__bar" aria-hidden="true"></span>
+            <span class="sidebar-toggle__bar" aria-hidden="true"></span>
+          </button>
+          <h2 id="view-title" class="dashboard-topbar__title">Overview</h2>
+        </header>
+
+        <main id="main-content" class="content-viewport">
+          <section
+            id="view-overview"
+            class="view-panel is-active"
+            data-view="overview"
+            aria-labelledby="overview-heading"
+          >
+            <div class="overview-layout">
+              <header class="overview-hero">
+                <div class="overview-hero__copy">
+                  <p class="overview-kicker">Executive summary</p>
+                  <h1 id="overview-heading">Imus City incident overview</h1>
+                  <p>
+                    Quarterly distribution and monthly totals from the traffic
+                    incident record (2022 through November 2024).
+                  </p>
                 </div>
+                <div
+                  class="year-pills"
+                  role="group"
+                  aria-label="Select year"
+                >
+                  <button
+                    type="button"
+                    class="year-pill is-active"
+                    data-year="2022"
+                    aria-pressed="true"
+                  >
+                    2022
+                  </button>
+                  <button
+                    type="button"
+                    class="year-pill"
+                    data-year="2023"
+                    aria-pressed="false"
+                  >
+                    2023
+                  </button>
+                  <button
+                    type="button"
+                    class="year-pill"
+                    data-year="2024"
+                    aria-pressed="false"
+                  >
+                    2024
+                  </button>
+                  <span id="year-value" class="visually-hidden">2022</span>
+                  <button type="button" id="left" class="visually-hidden" tabindex="-1" aria-hidden="true">Prev</button>
+                  <button type="button" id="right" class="visually-hidden" tabindex="-1" aria-hidden="true">Next</button>
+                </div>
+              </header>
+
+              <div class="overview-kpis" aria-live="polite">
+                <article class="kpi-card">
+                  <h4>Selected month</h4>
+                  <p id="month-value">—</p>
+                  <span class="kpi-card__hint">Click a month to load</span>
+                </article>
+                <article class="kpi-card">
+                  <h4>Incidents</h4>
+                  <p id="total-value">0</p>
+                  <span class="kpi-card__hint">Count in selected month</span>
+                </article>
+                <article class="kpi-card">
+                  <h4>Share of year</h4>
+                  <p id="percentage-value">0%</p>
+                  <span class="kpi-card__hint">Of annual total</span>
+                </article>
               </div>
-              <label class="visually-hidden" for="hour">Hour</label>
-              <select name="hour" id="hour" class="select-hour">
-                <option value="hour" selected>Hour</option>
-              </select>
-              <button
-                type="button"
-                id="search"
-                class="btn btn--icon"
-                aria-label="Run prediction"
-              >
-                <img
-                  src="{{ url_for('static', filename='assets/search.png') }}"
-                  alt=""
-                  width="22"
-                  height="22"
-                />
-              </button>
+
+              <div class="overview-grid">
+                <section class="overview-card overview-card--chart" aria-label="Quarterly mix">
+                  <header class="overview-card__head">
+                    <h2>Quarterly mix</h2>
+                    <p>Offense volume by quarter for the selected year</p>
+                  </header>
+                  <div class="donut-stage">
+                    <div class="donut-chart active" data-year="2022">
+                      {{ chart_2022|safe }}
+                    </div>
+                    <div class="donut-chart" data-year="2023">
+                      {{ chart_2023|safe }}
+                    </div>
+                    <div class="donut-chart" data-year="2024">
+                      {{ chart_2024|safe }}
+                    </div>
+                  </div>
+                </section>
+
+                <section class="overview-card overview-card--months" aria-label="Monthly breakdown">
+                  <header class="overview-card__head">
+                    <h2>Monthly breakdown</h2>
+                    <p>Select a month to update the KPI strip</p>
+                  </header>
+                  <ul id="month-btns" class="month-grid" aria-label="Months"></ul>
+                </section>
+              </div>
             </div>
           </section>
 
-          <div class="viz-stack">
+          <section
+            id="view-offense"
+            class="view-panel"
+            data-view="offense"
+            hidden
+            aria-labelledby="offense-heading"
+          >
+            <header class="view-header">
+              <h1 id="offense-heading">Offense Analytics</h1>
+              <p>Accident counts by offense type across 2022–2024.</p>
+            </header>
             <div class="bar-graph card-viz" id="bar-graph">
               <div class="header">
                 <h1>Accidents over the years</h1>
                 <p>2022 through November 18, 2024</p>
               </div>
-              <div class="plotly-wrap">{{bar_graph|safe}}</div>
+              <div class="plotly-wrap">{{ bar_graph|safe }}</div>
             </div>
-            <div class="heat-map card-viz" id="heat-map" hidden>
-              {{heat_map|safe}}
-            </div>
-          </div>
-
-          <section id="search-result" class="search-result card-viz" hidden>
-            <h4 id="brgy-value"></h4>
-            <span id="hr-value"></span>
-            <div class="chance-container">
-              <p class="chance-label">Chances of accident</p>
-              <h5 id="percent-result"></h5>
-            </div>
-            <button
-              type="button"
-              id="report-btn"
-              class="btn btn--link"
-              disabled
-              aria-disabled="true"
-              title="Run a prediction first to download a report"
-            >
-              Download summary report (PDF)
-            </button>
           </section>
-        </div>
 
-        <aside class="panel panel--side chart-box">
-          <div class="donut-chart active" data-year="2022">
-            {{chart_2022|safe}}
-          </div>
-          <div class="donut-chart" data-year="2023">{{chart_2023|safe}}</div>
-          <div class="donut-chart" data-year="2024">{{chart_2024|safe}}</div>
-          <div class="chart-bottom">
-            <div class="month-info">
-              <div class="month">
-                <h4>Month</h4>
-                <p id="month-value">n/a</p>
+          <section
+            id="view-map"
+            class="view-panel"
+            data-view="map"
+            hidden
+            aria-labelledby="map-heading"
+          >
+            <header class="view-header">
+              <h1 id="map-heading">Map &amp; Predictions</h1>
+              <p>
+                Explore the Imus choropleth and run barangay-hour accident risk
+                predictions.
+              </p>
+            </header>
+
+            <section class="toolbar" aria-label="Prediction filters">
+              <div class="toolbar__search">
+                <div id="search-box" class="search-box">
+                  <label class="visually-hidden" for="brgy">Barangay</label>
+                  <input
+                    type="text"
+                    name="brgy"
+                    id="brgy"
+                    placeholder="Barangay in Imus City"
+                    autocomplete="off"
+                  />
+                  <div class="result-box" hidden>
+                    <ul
+                      role="listbox"
+                      aria-label="Barangay suggestions"
+                    ></ul>
+                  </div>
+                </div>
+                <label class="visually-hidden" for="hour">Hour</label>
+                <select name="hour" id="hour" class="select-hour">
+                  <option value="hour" selected>Hour</option>
+                </select>
+                <button
+                  type="button"
+                  id="search"
+                  class="btn btn--icon"
+                  aria-label="Run prediction"
+                >
+                  <img
+                    src="{{ url_for('static', filename='assets/search.png') }}"
+                    alt=""
+                    width="22"
+                    height="22"
+                  />
+                </button>
               </div>
-              <div class="total">
-                <h4>Total</h4>
-                <p id="total-value">0</p>
+            </section>
+
+            <div class="map-layout">
+              <div class="heat-map card-viz" id="heat-map">
+                {{ heat_map|safe }}
               </div>
-              <div class="percent">
-                <h4>Share</h4>
-                <p id="percentage-value">0%</p>
-              </div>
+              <section
+                id="search-result"
+                class="search-result card-viz"
+                hidden
+              >
+                <h4 id="brgy-value"></h4>
+                <span id="hr-value"></span>
+                <div class="chance-container">
+                  <p class="chance-label">Chances of accident</p>
+                  <h5 id="percent-result"></h5>
+                </div>
+                <button
+                  type="button"
+                  id="report-btn"
+                  class="btn btn--link"
+                  disabled
+                  aria-disabled="true"
+                  title="Run a prediction first to download a report"
+                >
+                  Download summary report (PDF)
+                </button>
+              </section>
             </div>
-            <ul id="month-btns" class="month-grid" aria-label="Months"></ul>
-          </div>
-          <div class="toggle-year" role="group" aria-label="Year">
-            <button
-              type="button"
-              id="left"
-              class="toggle-year-btns"
-              aria-label="Previous year"
-            >
-              <img
-                src="{{ url_for('static', filename='assets/left.png') }}"
-                alt=""
-                width="28"
-                height="28"
-              />
-            </button>
-            <span id="year-value" class="year-label">2022</span>
-            <button
-              type="button"
-              id="right"
-              class="toggle-year-btns"
-              aria-label="Next year"
-            >
-              <img
-                src="{{ url_for('static', filename='assets/right.png') }}"
-                alt=""
-                width="28"
-                height="28"
-              />
-            </button>
-          </div>
-        </aside>
+          </section>
+
+          <section
+            id="view-ask"
+            class="view-panel view-panel--chat"
+            data-view="ask"
+            hidden
+            aria-labelledby="ask-heading"
+          >
+            {% include "partials/chat_panel.html" %}
+          </section>
+        </main>
       </div>
-    </main>
+    </div>
+
+    <div
+      id="sidebar-backdrop"
+      class="sidebar-backdrop"
+      hidden
+      data-close-sidebar
+    ></div>
+
+    {% include "partials/admin_modal.html" %}
+
     <script src="{{ url_for('static', filename='js/index.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/chat.js') }}"></script>
   </body>
 </html>

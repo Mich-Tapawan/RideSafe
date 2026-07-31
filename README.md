@@ -32,7 +32,8 @@ RideSafe is a traffic safety platform that uses historical incident data (2022�
 - **Interactive dashboards**: Dynamic bar graphs, heatmaps, and time-series charts built with Plotly and Folium
 - **PDF reports**: Multi-section barangay summary (KPIs, hourly chart, historical breakdown, ML recommendations) — run a prediction first, then download
 - **Geospatial analysis**: Accident density mapping using GeoJSON data of Imus barangays
-- **Ask RideSafe**: RAG chatbot (`/chat`) with Gemini + pgvector retrieval, plus allowlisted live DB/ML tools for rankings and predictions
+- **Ask RideSafe**: In-dashboard RAG chatbot (`/#ask`, `/chat` redirects) with Gemini + pgvector retrieval, plus allowlisted live DB/ML tools for rankings and predictions
+- **Sidebar dashboard**: Full-screen shell with Overview, Offense Analytics, Map & Predictions, and Ask RideSafe views (no full page reloads)
 - **Production-ready**: Postgres-backed data layer, startup caching, health checks, and rate limiting
 
 ## Tech Stack
@@ -206,8 +207,9 @@ RideSafe/
 │   └── summary_report.py         # PDF report data assembly
 │
 ├── templates/
-│   ├── index.html
-│   ├── chat.html
+│   ├── index.html                # Sidebar dashboard shell
+│   ├── chat.html                 # Legacy redirect helper
+│   ├── partials/                 # chat_panel, admin_modal
 │   └── pdf_template.html
 │
 └── static/
@@ -221,8 +223,8 @@ RideSafe/
 | Endpoint                       | Method | Description                                                       |
 | ------------------------------ | ------ | ----------------------------------------------------------------- |
 | `/health`                      | GET    | Health check (`{"status": "ok"}`)                               |
-| `/`                            | GET    | Main dashboard with visualizations (cached)                       |
-| `/chat`                        | GET    | Ask RideSafe chatbot page                                         |
+| `/`                            | GET    | Sidebar dashboard (Overview / Offense / Map / Ask); hash deep-links `#overview` `#offense` `#map` `#ask` |
+| `/chat`                        | GET    | Redirects to `/?view=ask` (Ask RideSafe view)                     |
 | `/api/chat`                    | POST   | RAG + live tools (`message`); guest limit 3/hour; admin unlimited |
 | `/api/chat/status`             | GET    | `{ admin, user_limit }` session status                            |
 | `/api/chat/admin/login`        | POST   | Unlock admin (`password`)                                         |

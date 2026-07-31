@@ -1,37 +1,160 @@
 document.addEventListener("DOMContentLoaded", () => {
-  const toggleBtn = document.getElementById("toggle-btn");
-  const barGraph = document.getElementById("bar-graph");
-  const heatMap = document.getElementById("heat-map");
+  const VIEW_TITLES = {
+    overview: "Overview",
+    offense: "Offense Analytics",
+    map: "Map & Predictions",
+    ask: "Ask RideSafe",
+  };
+  const VALID_VIEWS = Object.keys(VIEW_TITLES);
+
   const searchResult = document.getElementById("search-result");
   const reportBtn = document.getElementById("report-btn");
-
+  const heatMap = document.getElementById("heat-map");
   const monthName = document.getElementById("month-value");
   const totalValue = document.getElementById("total-value");
   const percentage = document.getElementById("percentage-value");
+  const viewTitle = document.getElementById("view-title");
+  const sidebarToggle = document.getElementById("sidebar-toggle");
+  const sidebarBackdrop = document.getElementById("sidebar-backdrop");
+  const navButtons = document.querySelectorAll(".sidebar-link[data-nav]");
+  const viewPanels = document.querySelectorAll(".view-panel[data-view]");
 
   const api = (path) => path;
 
   function setSearchResultVisible(visible) {
+    if (!searchResult) {
+      return;
+    }
     searchResult.hidden = !visible;
   }
 
   function notifyVizResize() {
     window.dispatchEvent(new Event("resize"));
-    if (typeof Plotly === "undefined") {
-      return;
+    if (typeof Plotly !== "undefined") {
+      document
+        .querySelectorAll(
+          "#view-offense:not([hidden]) #bar-graph .plotly-graph-div, #view-overview:not([hidden]) .donut-chart.active .plotly-graph-div",
+        )
+        .forEach((el) => {
+          try {
+            Plotly.Plots.resize(el);
+          } catch {
+            /* plot may not be ready */
+          }
+        });
     }
-    document
-      .querySelectorAll(
-        "#bar-graph:not([hidden]) .plotly-graph-div, #heat-map:not([hidden]) .plotly-graph-div, .donut-chart.active .plotly-graph-div",
-      )
-      .forEach((el) => {
+    if (heatMap && !heatMap.closest(".view-panel")?.hidden) {
+      const iframe = heatMap.querySelector("iframe");
+      if (iframe) {
         try {
-          Plotly.Plots.resize(el);
+          iframe.contentWindow?.dispatchEvent(new Event("resize"));
         } catch {
-          /* plot may not be ready */
+          /* cross-origin or unloaded */
         }
-      });
+        // Nudge layout after show
+        const h = iframe.style.height;
+        iframe.style.height = h || iframe.offsetHeight + "px";
+        requestAnimationFrame(() => {
+          iframe.style.height = h || "";
+        });
+      }
+    }
   }
+
+  function closeMobileSidebar() {
+    document.body.classList.remove("sidebar-open");
+    if (sidebarToggle) {
+      sidebarToggle.setAttribute("aria-expanded", "false");
+      sidebarToggle.setAttribute("aria-label", "Open navigation");
+    }
+    if (sidebarBackdrop) {
+      sidebarBackdrop.hidden = true;
+    }
+  }
+
+  function openMobileSidebar() {
+    document.body.classList.add("sidebar-open");
+    if (sidebarToggle) {
+      sidebarToggle.setAttribute("aria-expanded", "true");
+      sidebarToggle.setAttribute("aria-label", "Close navigation");
+    }
+    if (sidebarBackdrop) {
+      sidebarBackdrop.hidden = false;
+    }
+  }
+
+  function setView(name, { updateHistory = true } = {}) {
+    const view = VALID_VIEWS.includes(name) ? name : "overview";
+
+    viewPanels.forEach((panel) => {
+      const match = panel.dataset.view === view;
+      panel.hidden = !match;
+      panel.classList.toggle("is-active", match);
+    });
+
+    navButtons.forEach((btn) => {
+      const match = btn.dataset.nav === view;
+      btn.classList.toggle("is-active", match);
+      if (match) {
+        btn.setAttribute("aria-current", "page");
+      } else {
+        btn.removeAttribute("aria-current");
+      }
+    });
+
+    if (viewTitle) {
+      viewTitle.textContent = VIEW_TITLES[view];
+    }
+
+    if (updateHistory) {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("view");
+      url.hash = view;
+      history.replaceState(null, "", url.pathname + url.search + url.hash);
+    }
+
+    closeMobileSidebar();
+    requestAnimationFrame(() => notifyVizResize());
+  }
+
+  function viewFromLocation() {
+    const params = new URLSearchParams(window.location.search);
+    const fromQuery = params.get("view");
+    if (fromQuery && VALID_VIEWS.includes(fromQuery)) {
+      return fromQuery;
+    }
+    const hash = (window.location.hash || "").replace(/^#/, "");
+    if (hash && VALID_VIEWS.includes(hash)) {
+      return hash;
+    }
+    return "overview";
+  }
+
+  navButtons.forEach((btn) => {
+    btn.addEventListener("click", () => setView(btn.dataset.nav));
+  });
+
+  sidebarToggle?.addEventListener("click", () => {
+    if (document.body.classList.contains("sidebar-open")) {
+      closeMobileSidebar();
+    } else {
+      openMobileSidebar();
+    }
+  });
+
+  sidebarBackdrop?.addEventListener("click", closeMobileSidebar);
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && document.body.classList.contains("sidebar-open")) {
+      closeMobileSidebar();
+    }
+  });
+
+  window.addEventListener("hashchange", () => {
+    setView(viewFromLocation(), { updateHistory: false });
+  });
+
+  setView(viewFromLocation(), { updateHistory: true });
 
   requestAnimationFrame(() => notifyVizResize());
   window.addEventListener("resize", () => {
@@ -39,60 +162,59 @@ document.addEventListener("DOMContentLoaded", () => {
     window.__ridesafeResizeTimer = setTimeout(() => notifyVizResize(), 150);
   });
 
-  toggleBtn.addEventListener("click", () => {
-    const showingBar = toggleBtn.dataset.view === "bar";
-    if (showingBar) {
-      toggleBtn.dataset.view = "heat";
-      toggleBtn.textContent = "View bar graph";
-      barGraph.setAttribute("hidden", "");
-      heatMap.removeAttribute("hidden");
-    } else {
-      toggleBtn.dataset.view = "bar";
-      toggleBtn.textContent = "View heat map";
-      barGraph.removeAttribute("hidden");
-      heatMap.setAttribute("hidden", "");
-    }
-    setSearchResultVisible(false);
-    requestAnimationFrame(() => notifyVizResize());
-  });
-
   const donutCharts = document.querySelectorAll(".donut-chart");
-  const toggleYearBtns = document.querySelectorAll(".toggle-year-btns");
+  const yearPills = document.querySelectorAll(".year-pill[data-year]");
   const yearValue = document.getElementById("year-value");
   let currentYear = 2022;
 
-  toggleYearBtns.forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const direction = btn.id;
-      if (direction === "left") {
-        currentYear = currentYear === 2022 ? 2024 : currentYear - 1;
-      } else {
-        currentYear = currentYear === 2024 ? 2022 : currentYear + 1;
-      }
-
-      donutCharts.forEach((chart) => chart.classList.remove("active"));
-
-      if (currentYear === 2022) {
-        donutCharts[0].classList.add("active");
-      } else if (currentYear === 2023) {
-        donutCharts[1].classList.add("active");
-      } else {
-        donutCharts[2].classList.add("active");
-      }
-
-      yearValue.textContent = String(currentYear);
-      monthName.textContent = "n/a";
-      totalValue.textContent = "0";
-      percentage.textContent = "0%";
-
-      // Trigger Plotly to recalculate dimensions
-      requestAnimationFrame(() => {
-        notifyVizResize();
-        Plotly.Plots.resize(
-          document.querySelector(".donut-chart.active .plotly-graph-div"),
-        );
-      });
+  function setOverviewYear(year) {
+    currentYear = year;
+    donutCharts.forEach((chart) => {
+      const match = Number(chart.dataset.year) === year;
+      chart.classList.toggle("active", match);
     });
+    yearPills.forEach((pill) => {
+      const match = Number(pill.dataset.year) === year;
+      pill.classList.toggle("is-active", match);
+      pill.setAttribute("aria-pressed", String(match));
+    });
+    if (yearValue) {
+      yearValue.textContent = String(year);
+    }
+    monthName.textContent = "—";
+    totalValue.textContent = "0";
+    percentage.textContent = "0%";
+    document.querySelectorAll(".month-grid li").forEach((li) => {
+      li.classList.remove("is-selected");
+    });
+
+    requestAnimationFrame(() => {
+      notifyVizResize();
+      const activeDonut = document.querySelector(
+        ".donut-chart.active .plotly-graph-div",
+      );
+      if (activeDonut && typeof Plotly !== "undefined") {
+        try {
+          Plotly.Plots.resize(activeDonut);
+        } catch {
+          /* ignore */
+        }
+      }
+    });
+  }
+
+  yearPills.forEach((pill) => {
+    pill.addEventListener("click", () => {
+      setOverviewYear(Number(pill.dataset.year));
+    });
+  });
+
+  // Legacy prev/next hooks (hidden) still work if present
+  document.getElementById("left")?.addEventListener("click", () => {
+    setOverviewYear(currentYear === 2022 ? 2024 : currentYear - 1);
+  });
+  document.getElementById("right")?.addEventListener("click", () => {
+    setOverviewYear(currentYear === 2024 ? 2022 : currentYear + 1);
   });
 
   const monthBtns = document.getElementById("month-btns");
@@ -111,35 +233,20 @@ document.addEventListener("DOMContentLoaded", () => {
     "DEC",
   ];
 
-  const colors = ["#EBEB55", "#D4D700", "#55A630", "#007F5F"];
-  let colorCount = 0;
-
   months.forEach((month) => {
     const li = document.createElement("li");
-    const p = document.createElement("p");
-    const div = document.createElement("div");
-
-    p.textContent = month;
-
-    if (colorCount < 3) {
-      div.style.backgroundColor = colors[0];
-    } else if (colorCount < 6) {
-      div.style.backgroundColor = colors[1];
-    } else if (colorCount < 9) {
-      div.style.backgroundColor = colors[2];
-    } else {
-      div.style.backgroundColor = colors[3];
-    }
-
-    colorCount += 1;
-
-    li.appendChild(p);
-    li.appendChild(div);
-
-    li.addEventListener("click", () => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "month-chip";
+    btn.textContent = month;
+    btn.addEventListener("click", () => {
+      monthBtns.querySelectorAll("li").forEach((el) => {
+        el.classList.remove("is-selected");
+      });
+      li.classList.add("is-selected");
       fetchMonthData(currentYear, month);
     });
-
+    li.appendChild(btn);
     monthBtns.appendChild(li);
   });
 
@@ -217,9 +324,8 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     hideSuggestions();
     fetchAccidentPercentage(barangay.value, hour.value);
-    barGraph.setAttribute("hidden", "");
-    heatMap.setAttribute("hidden", "");
     setSearchResultVisible(true);
+    requestAnimationFrame(() => notifyVizResize());
   });
 
   barangay.addEventListener("focus", async () => {

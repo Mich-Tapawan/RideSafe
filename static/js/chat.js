@@ -16,6 +16,10 @@ document.addEventListener("DOMContentLoaded", () => {
   const adminError = document.getElementById("admin-login-error");
   const adminLogoutBtn = document.getElementById("admin-logout-btn");
 
+  if (!form || !input || !sendBtn || !messages) {
+    return;
+  }
+
   let history = loadHistory();
   let isAdmin = false;
 
@@ -43,6 +47,9 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function setStatus(text, isError) {
+    if (!status) {
+      return;
+    }
     if (!text) {
       status.hidden = true;
       status.textContent = "";
@@ -61,7 +68,7 @@ document.addEventListener("DOMContentLoaded", () => {
       quotaEl.textContent = "Admin · unlimited questions";
       quotaEl.classList.add("chat-quota--admin");
       adminBtn.textContent = "Admin ✓";
-      adminBtn.classList.add("nav-link--active");
+      adminBtn.classList.add("is-active");
       if (adminLogoutBtn) {
         adminLogoutBtn.hidden = false;
       }
@@ -69,7 +76,7 @@ document.addEventListener("DOMContentLoaded", () => {
       quotaEl.textContent = "Guest · 3 questions / hour";
       quotaEl.classList.remove("chat-quota--admin");
       adminBtn.textContent = "Admin";
-      adminBtn.classList.remove("nav-link--active");
+      adminBtn.classList.remove("is-active");
       if (adminLogoutBtn) {
         adminLogoutBtn.hidden = true;
       }
@@ -92,8 +99,10 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
     modal.hidden = false;
-    adminError.hidden = true;
-    adminError.textContent = "";
+    if (adminError) {
+      adminError.hidden = true;
+      adminError.textContent = "";
+    }
     if (adminPassword) {
       adminPassword.value = "";
       adminPassword.focus();
@@ -198,7 +207,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
   adminForm?.addEventListener("submit", async (event) => {
     event.preventDefault();
-    adminError.hidden = true;
+    if (adminError) {
+      adminError.hidden = true;
+    }
     try {
       const res = await fetch("/api/chat/admin/login", {
         method: "POST",
@@ -215,8 +226,10 @@ document.addEventListener("DOMContentLoaded", () => {
       closeModal();
       setStatus("Admin mode enabled — unlimited questions.");
     } catch (err) {
-      adminError.textContent = err.message || "Incorrect password.";
-      adminError.hidden = false;
+      if (adminError) {
+        adminError.textContent = err.message || "Incorrect password.";
+        adminError.hidden = false;
+      }
     }
   });
 

@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify, send_file, session
+from flask import Flask, render_template, request, jsonify, send_file, session, redirect
 from flask_cors import CORS
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
@@ -190,7 +190,8 @@ def _wkhtmltopdf_config():
 
 @app.route("/chat")
 def chat_page():
-    return render_template("chat.html")
+    """Legacy URL — chat lives in the dashboard Ask RideSafe view."""
+    return redirect("/?view=ask")
 
 
 @app.route("/api/chat/status", methods=["GET"])
