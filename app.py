@@ -28,6 +28,7 @@ from scripts.cache import (
 from scripts.rag import RagUnavailable, answer_question
 from scripts.build_rag_corpus import build_rag_corpus
 from scripts.dashboard_insights import barangay_insight_card
+from scripts.chat_tools import set_shared_model
 
 _log_level = os.environ.get("LOG_LEVEL", "INFO").upper()
 logging.basicConfig(
@@ -95,6 +96,7 @@ def _initialize_app():
     seed_database()
     accident_model.load_model()
     accident_model.precompute_city_hour_averages()
+    set_shared_model(accident_model)
     warm_dashboard_cache()
     warm_insights_cache(accident_model)
     threading.Thread(
@@ -293,6 +295,19 @@ def api_chat():
         return jsonify({"error": str(e)}), 400
     except RagUnavailable as e:
         return jsonify({"error": str(e)}), 503
+    except TimeoutError:
+        logging.exception("Chat timed out")
+        return (
+            jsonify(
+                {
+                    "error": (
+                        "The assistant took too long on this host. "
+                        "Try a shorter question (e.g. top barangays, or one barangay + hour)."
+                    )
+                }
+            ),
+            504,
+        )
     except Exception:
         logging.exception("Error in api_chat")
         return jsonify({"error": "Unable to answer right now. Please try again."}), 500

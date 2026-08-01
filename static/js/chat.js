@@ -279,6 +279,11 @@ document.addEventListener("DOMContentLoaded", () => {
         updateQuotaUi();
       }
       if (!res.ok) {
+        if (res.status === 502 || res.status === 504) {
+          throw new Error(
+            "Server timed out or restarted (common on free hosting). Wait a few seconds and try a shorter question."
+          );
+        }
         throw new Error(data.error || res.statusText || "Request failed");
       }
       pushEntry({

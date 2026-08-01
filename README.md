@@ -152,6 +152,10 @@ Health checks use `/health`.
 
 The Docker entrypoint starts Gunicorn immediately. On import the app seeds analytics if empty, warms caches, and builds the RAG corpus in a **background thread** (idempotent; skips when already populated). Chat may be briefly unavailable until embeddings finish.
 
+On **Render free**, Ask RideSafe runs in lean mode (`RENDER=true`): prefer live tools over embedding when possible, shorter Gemini timeouts, and Gunicorn worker recycling — ask concise questions if a request fails.
+
+On **Render free**, Ask RideSafe runs in lean mode (`RENDER=true`): prefer live tools over embedding when possible, shorter Gemini timeouts, and Gunicorn worker recycling — ask concise questions if a request fails.
+
 ### Keeping the free tier awake
 
 Render’s free web service sleeps after ~15 minutes of idle traffic. To reduce cold starts:

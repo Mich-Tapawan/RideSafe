@@ -33,6 +33,11 @@ CHAT_FALLBACK_MODELS = [
     if m.strip()
 ]
 
+# Render sets RENDER=true. Lean mode keeps /api/chat under free-tier proxy limits.
+LEAN_CHAT = os.environ.get("LEAN_CHAT", "").lower() in ("1", "true", "yes") or (
+    os.environ.get("RENDER", "").lower() in ("true", "1")
+)
+
 
 class RagUnavailable(Exception):
     """Raised when RAG cannot run (SQLite, missing key, empty corpus)."""
@@ -47,10 +52,24 @@ def _api_key() -> str:
     return key
 
 
+def _http_timeout_ms() -> int:
+    raw = os.environ.get("GEMINI_HTTP_TIMEOUT_MS")
+    if raw:
+        try:
+            return max(5_000, int(raw))
+        except ValueError:
+            pass
+    return 45_000 if LEAN_CHAT else 90_000
+
+
 def _client():
     from google import genai
+    from google.genai import types
 
-    return genai.Client(api_key=_api_key())
+    return genai.Client(
+        api_key=_api_key(),
+        http_options=types.HttpOptions(timeout=_http_timeout_ms()),
+    )
 
 
 def _extract_embedding_values(result) -> list[list[float]]:
@@ -137,6 +156,18 @@ def search_chunks(query: str, k: int = 8) -> list[dict]:
 
 
 def _chat_models() -> list[str]:
+    if LEAN_CHAT:
+        # Prefer fast/lite models first on free Render to finish under proxy limits.
+        ordered = []
+        for name in (
+            os.environ.get("GEMINI_CHAT_MODEL_LEAN", "gemini-flash-lite-latest"),
+            CHAT_MODEL,
+            *CHAT_FALLBACK_MODELS,
+        ):
+            if name and name not in ordered:
+                ordered.append(name)
+        return ordered[:2]
+
     models = [CHAT_MODEL]
     for name in CHAT_FALLBACK_MODELS:
         if name not in models:
@@ -153,11 +184,13 @@ def _generate_answer(prompt: str) -> str:
     config = types.GenerateContentConfig(
         automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
         temperature=0.2,
+        max_output_tokens=512 if LEAN_CHAT else 1024,
     )
     last_error: Exception | None = None
+    attempts_per_model = 1 if LEAN_CHAT else 3
 
     for model in _chat_models():
-        for attempt in range(3):
+        for attempt in range(attempts_per_model):
             try:
                 response = client.models.generate_content(
                     model=model,
@@ -171,8 +204,8 @@ def _generate_answer(prompt: str) -> str:
             except (ClientError, ServerError, APIError) as exc:
                 last_error = exc
                 status = getattr(exc, "code", None) or getattr(exc, "status_code", None)
-                if status in (429, 503) and attempt < 2:
-                    delay = 1.5 * (attempt + 1)
+                if status in (429, 503) and attempt < attempts_per_model - 1:
+                    delay = 1.0 * (attempt + 1)
                     logger.warning(
                         "Gemini %s on %s (attempt %s); retrying in %.1fs",
                         status,
@@ -186,18 +219,48 @@ def _generate_answer(prompt: str) -> str:
                     logger.warning("Gemini %s on %s; trying next model", status, model)
                     break
                 raise
+            except Exception as exc:
+                # Timeouts / transport errors: fail over quickly on lean hosts.
+                last_error = exc
+                logger.warning("Gemini transport error on %s: %s", model, exc)
+                break
 
     raise RagUnavailable(
         "Gemini is temporarily overloaded or rate-limited. Please try again in a moment."
     ) from last_error
 
 
+def _wants_rag_context(message: str, tool_results: list) -> bool:
+    """On lean hosts, skip embedding when allowlisted tools already answered."""
+    if not LEAN_CHAT:
+        return True
+    if not tool_results:
+        return True
+    lower = message.lower()
+    faq_tokens = (
+        "how do",
+        "how to",
+        "what is",
+        "what's",
+        "explain",
+        "help",
+        "faq",
+        "report",
+        "pdf",
+        "ridesafe",
+        "mean",
+        "definition",
+    )
+    return any(token in lower for token in faq_tokens)
+
+
 def answer_question(message: str) -> dict:
     message = (message or "").strip()
     if not message:
         raise ValueError("Message is required.")
-    if len(message) > 1000:
-        raise ValueError("Message must be at most 1000 characters.")
+    max_len = 500 if LEAN_CHAT else 1000
+    if len(message) > max_len:
+        raise ValueError(f"Message must be at most {max_len} characters.")
 
     if not is_postgres():
         raise RagUnavailable(
@@ -205,17 +268,28 @@ def answer_question(message: str) -> dict:
         )
 
     begin_tool_trace()
-    hits = search_chunks(message, k=8)
     tool_results = select_and_run_tools(message)
+
+    hits: list[dict] = []
+    if _wants_rag_context(message, tool_results):
+        try:
+            hits = search_chunks(message, k=3 if LEAN_CHAT else 8)
+        except Exception as exc:
+            logger.warning("RAG search failed; continuing with tools only: %s", exc)
+            hits = []
 
     sources = []
     seen = set()
     context_blocks = []
+    chunk_cap = 350 if LEAN_CHAT else 900
     for i, hit in enumerate(hits, start=1):
         label = hit["title"]
         if hit.get("barangay"):
             label = f"{hit['title']} ({hit['barangay']})"
-        context_blocks.append(f"[{i}] {label}\n{hit['chunk_text']}")
+        text = hit["chunk_text"] or ""
+        if len(text) > chunk_cap:
+            text = text[: chunk_cap - 1] + "…"
+        context_blocks.append(f"[{i}] {label}\n{text}")
         key = (hit["title"], hit.get("barangay"))
         if key not in seen:
             seen.add(key)
@@ -229,7 +303,9 @@ def answer_question(message: str) -> dict:
 
     live_block = format_tool_context(tool_results)
     if live_block:
-        context_blocks.append("Live allowlisted tool results (prefer for numbers):\n" + live_block)
+        context_blocks.append(
+            "Live allowlisted tool results (prefer for numbers):\n" + live_block
+        )
 
     for call in get_tool_trace():
         title = f"Live tool: {call['name']}"
@@ -247,11 +323,17 @@ def answer_question(message: str) -> dict:
 
     if not context_blocks:
         return {
-            "answer": "I could not find relevant RideSafe data for that question.",
+            "answer": (
+                "I could not find relevant RideSafe data for that question. "
+                "Try asking about barangay rankings, offenses, monthly totals, or predicted risk."
+            ),
             "sources": [],
         }
 
     context = "\n\n".join(context_blocks)
+    if LEAN_CHAT and len(context) > 6000:
+        context = context[:5999] + "…"
+
     system = (
         "You are RideSafe Assistant for Imus City traffic accident data (2022–Nov 2024). "
         "Answer using the RAG context and any Live allowlisted tool results. "

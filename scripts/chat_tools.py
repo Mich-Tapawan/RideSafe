@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import re
 from contextvars import ContextVar
 from typing import Any, Optional
@@ -71,6 +72,13 @@ def _get_model():
         model.precompute_city_hour_averages()
         _accident_model = model
     return _accident_model
+
+
+def set_shared_model(model) -> None:
+    """Reuse the app's loaded AccidentModel (avoids a second copy in memory)."""
+    global _accident_model
+    if model is not None:
+        _accident_model = model
 
 
 def _barangay_list():
@@ -296,6 +304,33 @@ def rank_peak_predicted_risk(
     """Rank barangays by peak (worst-hour) predicted risk from the ML model."""
     limit = _clamp_limit(limit)
     order = _normalize_order(order)
+
+    # Prefer precomputed dashboard insights (avoids predict_all_hours × N barangays).
+    try:
+        from scripts.cache import get_city_insights_cached
+
+        insights = get_city_insights_cached()
+    except Exception:
+        insights = None
+
+    if insights:
+        cached_key = (
+            "highest_peak_risk" if order == "highest" else "lowest_peak_risk"
+        )
+        cached_rows = list(insights.get(cached_key) or [])
+        if cached_rows:
+            rows = cached_rows[:limit]
+            _record(
+                "rank_peak_predicted_risk",
+                {"order": order, "limit": limit, "source": "insights_cache"},
+                f"{order} {len(rows)} barangays by peak predicted risk (cached)",
+            )
+            return {
+                "metric": "peak_predicted_risk_percent",
+                "order": order,
+                "results": rows,
+            }
+
     model = _get_model()
     rows = []
     for barangay in _barangay_list():
@@ -324,7 +359,7 @@ def rank_peak_predicted_risk(
     rows = rows[:limit]
     _record(
         "rank_peak_predicted_risk",
-        {"order": order, "limit": limit},
+        {"order": order, "limit": limit, "source": "live_scan"},
         f"{order} {len(rows)} barangays by peak predicted risk",
     )
     return {
@@ -400,7 +435,9 @@ def select_and_run_tools(message: str) -> list[dict[str, Any]]:
     """Deterministic allowlisted tool router (safe live queries, no free-form SQL)."""
     lower = message.lower()
     year = _extract_year(message)
-    limit = _extract_limit(message, default=10)
+    # Keep tool payloads small on constrained hosts.
+    default_limit = 5 if os.environ.get("RENDER", "").lower() in ("true", "1") else 10
+    limit = _extract_limit(message, default=default_limit)
     order = "lowest" if _wants_lowest(message) else "highest"
     results: list[dict[str, Any]] = []
 
@@ -522,6 +559,6 @@ def format_tool_context(tool_results: list[dict[str, Any]]) -> str:
     for item in tool_results:
         blocks.append(
             f"Tool `{item['tool']}` result:\n"
-            + json.dumps(item["data"], indent=2, default=str)
+            + json.dumps(item["data"], separators=(",", ":"), default=str)
         )
     return "\n\n".join(blocks)

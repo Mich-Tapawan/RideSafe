@@ -100,7 +100,7 @@
             <i data-lucide="layout-dashboard" class="title-icon" aria-hidden="true"></i>
             <span>Overview</span>
           </h2>
-        </header>
+    </header>
 
         <main id="main-content" class="content-viewport">
           <section
@@ -143,8 +143,8 @@
                   >
                     2023
                   </button>
-                  <button
-                    type="button"
+            <button
+              type="button"
                     class="year-pill"
                     data-year="2024"
                     aria-pressed="false"
@@ -371,37 +371,37 @@
             </header>
 
             <section class="toolbar" aria-label="Prediction filters">
-              <div class="toolbar__search">
-                <div id="search-box" class="search-box">
-                  <label class="visually-hidden" for="brgy">Barangay</label>
-                  <input
-                    type="text"
-                    name="brgy"
-                    id="brgy"
-                    placeholder="Barangay in Imus City"
-                    autocomplete="off"
-                  />
-                  <div class="result-box" hidden>
+            <div class="toolbar__search">
+              <div id="search-box" class="search-box">
+                <label class="visually-hidden" for="brgy">Barangay</label>
+                <input
+                  type="text"
+                  name="brgy"
+                  id="brgy"
+                  placeholder="Barangay in Imus City"
+                  autocomplete="off"
+                />
+                <div class="result-box" hidden>
                     <ul
                       role="listbox"
                       aria-label="Barangay suggestions"
                     ></ul>
                   </div>
-                </div>
-                <label class="visually-hidden" for="hour">Hour</label>
-                <select name="hour" id="hour" class="select-hour">
-                  <option value="hour" selected>Hour</option>
-                </select>
-                <button
-                  type="button"
-                  id="search"
-                  class="btn btn--icon"
-                  aria-label="Run prediction"
-                >
-                  <i data-lucide="search" aria-hidden="true"></i>
-                </button>
               </div>
-            </section>
+              <label class="visually-hidden" for="hour">Hour</label>
+              <select name="hour" id="hour" class="select-hour">
+                <option value="hour" selected>Hour</option>
+              </select>
+              <button
+                type="button"
+                id="search"
+                class="btn btn--icon"
+                aria-label="Run prediction"
+              >
+                  <i data-lucide="search" aria-hidden="true"></i>
+              </button>
+            </div>
+          </section>
 
             <div class="predict-layout">
               <div class="predict-main">
@@ -410,24 +410,24 @@
                   class="search-result card-viz"
                   hidden
                 >
-                  <h4 id="brgy-value"></h4>
-                  <span id="hr-value"></span>
-                  <div class="chance-container">
-                    <p class="chance-label">Chances of accident</p>
-                    <h5 id="percent-result"></h5>
-                  </div>
-                  <button
-                    type="button"
-                    id="report-btn"
-                    class="btn btn--link"
-                    disabled
-                    aria-disabled="true"
-                    title="Run a prediction first to download a report"
-                  >
+            <h4 id="brgy-value"></h4>
+            <span id="hr-value"></span>
+            <div class="chance-container">
+              <p class="chance-label">Chances of accident</p>
+              <h5 id="percent-result"></h5>
+            </div>
+            <button
+              type="button"
+              id="report-btn"
+              class="btn btn--link"
+              disabled
+              aria-disabled="true"
+              title="Run a prediction first to download a report"
+            >
                     <i data-lucide="file-down" aria-hidden="true"></i>
-                    Download summary report (PDF)
-                  </button>
-                </section>
+              Download summary report (PDF)
+            </button>
+          </section>
 
                 <section
                   id="barangay-insight"
@@ -456,21 +456,21 @@
                         Lowest risk hour
                       </dt>
                       <dd id="insight-lowest"></dd>
-                    </div>
+        </div>
                     <div>
                       <dt>
                         <i data-lucide="calendar-range" aria-hidden="true"></i>
                         Peak quarter
                       </dt>
                       <dd id="insight-quarter"></dd>
-                    </div>
+          </div>
                     <div>
                       <dt>
                         <i data-lucide="hash" aria-hidden="true"></i>
                         Incidents
                       </dt>
                       <dd id="insight-incidents"></dd>
-                    </div>
+              </div>
                   </dl>
                   <ul id="insight-recs" class="insight-recs"></ul>
                 </section>
