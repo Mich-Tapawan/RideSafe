@@ -1,5 +1,7 @@
+import logging
 import os
 from pathlib import Path
+from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
@@ -15,11 +17,16 @@ from sqlalchemy import (
     text,
 )
 from sqlalchemy.orm import DeclarativeBase, relationship, sessionmaker
+from sqlalchemy.pool import NullPool
 
 _engine = None
 SessionLocal = None
 
 EMBEDDING_DIM = 768
+logger = logging.getLogger(__name__)
+
+# Hosts that typically do not need (or reject) forced SSL.
+_LOCAL_DB_HOSTS = frozenset({"localhost", "127.0.0.1", "::1", "db"})
 
 
 class Base(DeclarativeBase):
@@ -91,16 +98,62 @@ class RagChunk(Base):
     document = relationship("RagDocument", back_populates="chunks")
 
 
+def _set_query_param(url: str, key: str, value: str) -> str:
+    parsed = urlparse(url)
+    query = parse_qs(parsed.query, keep_blank_values=True)
+    query[key] = [value]
+    flat = [(k, v) for k, vals in query.items() for v in vals]
+    return urlunparse(parsed._replace(query=urlencode(flat)))
+
+
 def _normalize_database_url(url: str) -> str:
+    """Normalize Postgres URLs for SQLAlchemy + cloud hosts (Supabase, Render)."""
     if url.startswith("postgres://"):
-        return url.replace("postgres://", "postgresql://", 1)
+        url = url.replace("postgres://", "postgresql://", 1)
+
+    if not url.startswith("postgresql"):
+        return url
+
+    parsed = urlparse(url)
+    host = (parsed.hostname or "").lower()
+    query = parse_qs(parsed.query, keep_blank_values=True)
+
+    # Supabase / managed Postgres require TLS; local Compose does not.
+    if host and host not in _LOCAL_DB_HOSTS and "sslmode" not in query:
+        url = _set_query_param(url, "sslmode", "require")
+
     return url
+
+
+def _is_supabase_transaction_pooler(url: str) -> bool:
+    """Supabase transaction pooler uses port 6543 (PgBouncer transaction mode)."""
+    parsed = urlparse(url)
+    return parsed.port == 6543
+
+
+def _engine_kwargs(url: str) -> dict:
+    if url.startswith("sqlite"):
+        return {"connect_args": {"check_same_thread": False}}
+
+    kwargs = {
+        "pool_pre_ping": True,
+        "pool_recycle": int(os.environ.get("DB_POOL_RECYCLE", "300")),
+    }
+
+    # Transaction-mode poolers should not use SQLAlchemy's own pool.
+    if _is_supabase_transaction_pooler(url):
+        kwargs["poolclass"] = NullPool
+        return kwargs
+
+    kwargs["pool_size"] = int(os.environ.get("DB_POOL_SIZE", "2"))
+    kwargs["max_overflow"] = int(os.environ.get("DB_MAX_OVERFLOW", "2"))
+    return kwargs
 
 
 def get_database_url() -> str:
     url = os.environ.get("DATABASE_URL")
     if url:
-        return _normalize_database_url(url)
+        return _normalize_database_url(url.strip())
     data_dir = Path(".data")
     data_dir.mkdir(exist_ok=True)
     return f"sqlite:///{data_dir / 'ridesafe.db'}"
@@ -110,20 +163,48 @@ def is_postgres() -> bool:
     return get_database_url().startswith("postgresql")
 
 
+def _ensure_pgvector(engine) -> None:
+    try:
+        with engine.begin() as conn:
+            conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
+    except Exception as exc:
+        logger.warning(
+            "Could not CREATE EXTENSION vector (%s). "
+            "On Supabase: Dashboard → Database → Extensions → enable \"vector\", then restart.",
+            exc,
+        )
+
+
+def _ensure_vector_index(engine) -> None:
+    """HNSW index for cosine retrieval; safe to skip if extension/index unavailable."""
+    try:
+        with engine.begin() as conn:
+            conn.execute(
+                text(
+                    """
+                    CREATE INDEX IF NOT EXISTS rag_chunks_embedding_hnsw_idx
+                    ON rag_chunks
+                    USING hnsw (embedding vector_cosine_ops)
+                    """
+                )
+            )
+    except Exception as exc:
+        logger.warning("Could not create rag_chunks HNSW index (%s).", exc)
+
+
 def init_db():
     global _engine, SessionLocal
     if _engine is not None:
         return
 
     url = get_database_url()
-    connect_args = {"check_same_thread": False} if url.startswith("sqlite") else {}
-    _engine = create_engine(url, connect_args=connect_args)
+    _engine = create_engine(url, **_engine_kwargs(url))
     SessionLocal = sessionmaker(bind=_engine, autoflush=False, autocommit=False)
 
     if url.startswith("postgresql"):
-        with _engine.begin() as conn:
-            conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
+        _ensure_pgvector(_engine)
         Base.metadata.create_all(_engine)
+        _ensure_vector_index(_engine)
     else:
         # Skip RAG tables on SQLite (pgvector unsupported)
         analytics = [

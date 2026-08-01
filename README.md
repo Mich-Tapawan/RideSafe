@@ -90,31 +90,64 @@ RideSafe is a traffic safety platform that uses historical incident data (2022�
 
 ### Local development (Docker + Postgres)
 
-1. Create a `.env` file in the project root (gitignored) with your Gemini API key:
+1. Copy [`.env.example`](.env.example) to `.env` and set at least:
 
    ```bash
    GOOGLE_API_KEY=your_key_here
    ```
 
-2. Start Postgres (pgvector) + the app:
+2. Start local Postgres (pgvector) + the app:
 
    ```bash
    docker compose up --build
    ```
 
+   Compose always sets `DATABASE_URL` to the local `db` service (`postgresql://ridesafe:ridesafe@db:5432/ridesafe`). A Supabase URL in `.env` is ignored by Docker — use Render env vars for production.
+
 Open `http://localhost:10000`. The web container seeds analytics, builds the RAG corpus (when `GOOGLE_API_KEY` is set), then starts Gunicorn.
 
 Without `GOOGLE_API_KEY`, the dashboard still runs; `/chat` and `/api/chat` return a clear “not ready” / missing-key message.
 
-### Production (Render)
+### Supabase (Postgres + pgvector)
 
-Deploy with the included [`render.yaml`](render.yaml) Blueprint. It provisions:
+Use this when moving off Render’s free Postgres (or for any cloud DB).
 
-- A **PostgreSQL** database (`ridesafe-db`) — enable/use the `vector` extension (created on app startup)
-- A **Docker web service** with `DATABASE_URL` linked automatically
-- Health checks on `/health`
+1. In the [Supabase](https://supabase.com) project **RideSafe** → **Database** → **Extensions**, enable **`vector`** (pgvector).
+2. **Project Settings** → **Database** → copy the **URI** connection string.
+   - Prefer the **Transaction pooler** (port **6543**) for the web app (Gunicorn / Render).
+   - Use the **Session** pooler or direct host for one-off troubleshooting if needed.
+3. Set **`DATABASE_URL` on Render** (or any non-Compose host) — not in Docker Compose:
 
-Set **`GOOGLE_API_KEY`** in the Render dashboard (Blueprint marks it as a sync env var — you supply the value). Without it, the site boots but the chatbot corpus is skipped.
+   ```bash
+   DATABASE_URL=postgresql://postgres.[PROJECT-REF]:[PASSWORD]@aws-0-[REGION].pooler.supabase.com:6543/postgres
+   ```
+
+   The app adds `sslmode=require` automatically for non-local hosts.
+4. Seed + build RAG (first time, or after `--force`):
+
+   ```bash
+   python -m scripts.seed_database
+   python -m scripts.build_rag_corpus
+   ```
+
+   Or restart the Docker/Render web service — the entrypoint runs both idempotently.
+
+Startup creates analytics + RAG tables (`rag_documents`, `rag_chunks` with `vector(768)`), and an HNSW index for cosine search when permitted.
+
+### Production (Render + Supabase)
+
+Deploy with the included [`render.yaml`](render.yaml) Blueprint. It provisions a **Docker web service** only — **Postgres is on Supabase**.
+
+In the Render dashboard, set:
+
+| Variable | Notes |
+| -------- | ----- |
+| `DATABASE_URL` | Supabase **Transaction pooler** URI (port 6543) |
+| `GOOGLE_API_KEY` | Required for Ask RideSafe / RAG corpus |
+| `SECRET_KEY` | Strong random value in production |
+| `CHAT_ADMIN_PASSWORD` | Optional override |
+
+Health checks use `/health`.
 
 The Docker entrypoint runs:
 
@@ -140,20 +173,23 @@ Always ping **`/health`**, not `/` (the homepage is expensive to generate).
 
 | Variable | Description | Default |
 | -------- | ----------- | ------- |
-| `DATABASE_URL` | Postgres connection string | SQLite at `.data/ridesafe.db` |
+| `DATABASE_URL` | Postgres URI (Supabase pooler or local). Non-local hosts get `sslmode=require` | SQLite at `.data/ridesafe.db` |
 | `GOOGLE_API_KEY` | Gemini API key for embeddings + chat | unset (chat unavailable) |
 | `SECRET_KEY` | Flask session secret (admin chat mode) | dev default in code |
 | `CHAT_ADMIN_PASSWORD` | Ask RideSafe admin unlock password | `RideSafe2026!` |
 | `GEMINI_EMBED_MODEL` | Embedding model name | `gemini-embedding-001` |
 | `GEMINI_CHAT_MODEL` | Chat model name | `gemini-flash-latest` |
 | `GEMINI_CHAT_FALLBACKS` | Comma-separated fallbacks on 429/503 | `gemini-flash-lite-latest,gemini-3.5-flash-lite,gemini-3.1-flash-lite` |
+| `DB_POOL_SIZE` | SQLAlchemy pool size (session mode only) | `2` |
+| `DB_MAX_OVERFLOW` | SQLAlchemy max overflow | `2` |
+| `DB_POOL_RECYCLE` | Recycle connections after N seconds | `300` |
 | `WKHTMLTOPDF_PATH` | Path to wkhtmltopdf binary | Auto-detected |
 | `WEB_CONCURRENCY` | Gunicorn worker count | `1` |
 | `LOG_LEVEL` | Python log level | `INFO` |
 | `FLASK_DEBUG` | Enable Flask debug mode (`1` to enable) | off |
 | `EXCEL_FILE_PATH` | Path to xlsx for seeding | `traffic-incident.xlsx` |
 
-Do not commit API keys; keep `.env` gitignored.
+Do not commit API keys; keep `.env` gitignored. See [`.env.example`](.env.example).
 
 ## Data updates
 
@@ -176,7 +212,7 @@ Runtime reads from the database, not the xlsx file. To refresh data:
 
 ## Architecture
 
-On startup the app: initializes the DB (incl. `CREATE EXTENSION vector` on Postgres) → seeds from xlsx (if empty) → builds RAG corpus if empty → loads the ML model → precomputes city-wide hourly averages → warms the dashboard HTML cache.
+On startup the app: initializes the DB (ensures `vector` extension + tables + HNSW index on Postgres/Supabase) → seeds from xlsx (if empty) → builds RAG corpus if empty → loads the ML model → precomputes city-wide hourly averages → warms the dashboard HTML cache.
 
 The homepage and barangay list are served from in-memory cache. API endpoints query Postgres/SQLite. PDF reports combine DB incident history with ML predictions. Chat retrieves embedded insight chunks via pgvector cosine search and may call allowlisted tools (incident rankings, offense breakdowns, monthly totals, barangay summaries, ML hour risk) — never free-form SQL — then answers with Gemini.
 
@@ -187,8 +223,9 @@ RideSafe/
 ├── app.py                        # Flask application & routes
 ├── traffic-incident.xlsx         # Source data for DB seeding
 ├── Dockerfile                    # Production image (wkhtmltopdf, GDAL, Gunicorn)
-├── docker-compose.yml            # Local Postgres + web
-├── render.yaml                   # Render Blueprint (web + Postgres)
+├── docker-compose.yml            # Local Postgres + web (always uses Compose DB)
+├── render.yaml                   # Render Blueprint (web; DATABASE_URL → Supabase)
+├── .env.example                  # Env template (Gemini; Supabase URL for Render)
 ├── requirements.txt
 ├── Procfile
 │
