@@ -130,7 +130,8 @@ Use this when moving off Render’s free Postgres (or for any cloud DB).
    python -m scripts.build_rag_corpus
    ```
 
-   Or restart the Docker/Render web service — the entrypoint runs both idempotently.
+   Or restart the Docker/Render web service — startup seeds if empty and builds the
+   RAG corpus in a background thread (so the web port binds immediately).
 
 Startup creates analytics + RAG tables (`rag_documents`, `rag_chunks` with `vector(768)`), and an HNSW index for cosine search when permitted.
 
@@ -149,13 +150,7 @@ In the Render dashboard, set:
 
 Health checks use `/health`.
 
-The Docker entrypoint runs:
-
-```text
-python -m scripts.seed_database && python -m scripts.build_rag_corpus && gunicorn ...
-```
-
-Both seed and corpus steps are idempotent (skip when already populated).
+The Docker entrypoint starts Gunicorn immediately. On import the app seeds analytics if empty, warms caches, and builds the RAG corpus in a **background thread** (idempotent; skips when already populated). Chat may be briefly unavailable until embeddings finish.
 
 ### Keeping the free tier awake
 
@@ -212,7 +207,7 @@ Runtime reads from the database, not the xlsx file. To refresh data:
 
 ## Architecture
 
-On startup the app: initializes the DB (ensures `vector` extension + tables + HNSW index on Postgres/Supabase) → seeds from xlsx (if empty) → builds RAG corpus if empty → loads the ML model → precomputes city-wide hourly averages → warms the dashboard HTML cache.
+On startup the app: initializes the DB (ensures `vector` extension + tables + HNSW index on Postgres/Supabase) → seeds from xlsx (if empty) → loads the ML model → precomputes city-wide hourly averages → warms the dashboard HTML cache → builds the RAG corpus in the background if empty.
 
 The homepage and barangay list are served from in-memory cache. API endpoints query Postgres/SQLite. PDF reports combine DB incident history with ML predictions. Chat retrieves embedded insight chunks via pgvector cosine search and may call allowlisted tools (incident rankings, offense breakdowns, monthly totals, barangay summaries, ML hour risk) — never free-form SQL — then answers with Gemini.
 

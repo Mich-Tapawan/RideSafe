@@ -10,6 +10,7 @@ import re
 import logging
 import os
 import secrets
+import threading
 from io import BytesIO
 
 from scripts.month_data import generate_month_list
@@ -81,18 +82,27 @@ def _ratelimit_handler(exc):
     )
 
 
-def _initialize_app():
-    init_db()
-    seed_database()
+def _build_rag_corpus_background():
+    """Embed RAG docs off the request/startup critical path (Render port scan)."""
     try:
         build_rag_corpus(force=False)
     except Exception:
         logging.exception("RAG corpus build failed; chat may be unavailable")
+
+
+def _initialize_app():
+    init_db()
+    seed_database()
     accident_model.load_model()
     accident_model.precompute_city_hour_averages()
     warm_dashboard_cache()
     warm_insights_cache(accident_model)
-    logging.info("RideSafe startup complete.")
+    threading.Thread(
+        target=_build_rag_corpus_background,
+        name="rag-corpus-build",
+        daemon=True,
+    ).start()
+    logging.info("RideSafe startup complete (RAG corpus building in background).")
 
 
 _initialize_app()
