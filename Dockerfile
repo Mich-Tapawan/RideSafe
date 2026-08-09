@@ -26,6 +26,6 @@ COPY . .
 
 EXPOSE 10000
 
-# Bind immediately so Render's port scan succeeds. Seed + RAG run inside app import.
-# timeout 90 < typical free-proxy limits; max-requests recycles memory after chat spikes.
-CMD ["sh", "-c", "gunicorn --bind 0.0.0.0:${PORT:-10000} --workers ${WEB_CONCURRENCY:-1} --threads 1 --timeout ${GUNICORN_TIMEOUT:-90} --graceful-timeout 20 --max-requests ${GUNICORN_MAX_REQUESTS:-40} --max-requests-jitter 10 --access-logfile - app:app"]
+# Bind fast for Render deploy health checks. max-requests 0 = no worker recycle (avoids
+# re-running heavy import warmup on free tier). Set GUNICORN_MAX_REQUESTS>0 to re-enable.
+CMD ["sh", "-c", "gunicorn --bind 0.0.0.0:${PORT:-10000} --workers ${WEB_CONCURRENCY:-1} --threads 1 --timeout ${GUNICORN_TIMEOUT:-90} --graceful-timeout 20 --max-requests ${GUNICORN_MAX_REQUESTS:-0} --access-logfile - app:app"]

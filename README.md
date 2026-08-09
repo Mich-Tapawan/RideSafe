@@ -150,7 +150,7 @@ In the Render dashboard, set:
 
 Health checks use `/health`.
 
-The Docker entrypoint starts Gunicorn immediately. On import the app seeds analytics if empty, warms caches, and builds the RAG corpus in a **background thread** (idempotent; skips when already populated). Chat may be briefly unavailable until embeddings finish.
+The Docker entrypoint starts Gunicorn immediately. On import the app seeds analytics if empty, loads the ML model, then warms the **dashboard/insights caches and RAG corpus in background threads** so Render health checks pass before the heavy HTML/embedding work finishes. The first `/` request will build caches on demand if warmup is still running.
 
 On **Render free**, Ask RideSafe runs in lean mode (`RENDER=true`): prefer live tools over embedding when possible, shorter Gemini timeouts, and Gunicorn worker recycling — ask concise questions if a request fails.
 
@@ -214,7 +214,7 @@ Runtime reads from the database, not the xlsx file. To refresh data:
 
 ## Architecture
 
-On startup the app: initializes the DB (ensures `vector` extension + tables + HNSW index on Postgres/Supabase) → seeds from xlsx (if empty) → loads the ML model → precomputes city-wide hourly averages → warms the dashboard HTML cache → builds the RAG corpus in the background if empty.
+On startup the app: initializes the DB → seeds from xlsx (if empty) → loads the ML model → precomputes city-hour averages → then warms dashboard/insights caches and the RAG corpus in **background threads** so `/health` can succeed during Render deploys.
 
 The homepage and barangay list are served from in-memory cache. API endpoints query Postgres/SQLite. PDF reports combine DB incident history with ML predictions. Chat retrieves embedded insight chunks via pgvector cosine search and may call allowlisted tools (incident rankings, offense breakdowns, monthly totals, barangay summaries, ML hour risk) — never free-form SQL — then answers with Gemini.
 

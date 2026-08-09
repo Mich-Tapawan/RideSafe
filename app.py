@@ -91,20 +91,35 @@ def _build_rag_corpus_background():
         logging.exception("RAG corpus build failed; chat may be unavailable")
 
 
+def _warm_caches_background(model):
+    """Dashboard/insights HTML is heavy — do not block Gunicorn bind / Render deploy."""
+    try:
+        warm_dashboard_cache()
+        warm_insights_cache(model)
+    except Exception:
+        logging.exception("Cache warmup failed; first request may rebuild caches")
+
+
 def _initialize_app():
     init_db()
     seed_database()
     accident_model.load_model()
     accident_model.precompute_city_hour_averages()
     set_shared_model(accident_model)
-    warm_dashboard_cache()
-    warm_insights_cache(accident_model)
+    threading.Thread(
+        target=_warm_caches_background,
+        args=(accident_model,),
+        name="cache-warmup",
+        daemon=True,
+    ).start()
     threading.Thread(
         target=_build_rag_corpus_background,
         name="rag-corpus-build",
         daemon=True,
     ).start()
-    logging.info("RideSafe startup complete (RAG corpus building in background).")
+    logging.info(
+        "RideSafe startup complete (dashboard cache + RAG corpus warming in background)."
+    )
 
 
 _initialize_app()
