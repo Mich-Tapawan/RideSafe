@@ -309,7 +309,7 @@ def rank_peak_predicted_risk(
     try:
         from scripts.cache import get_city_insights_cached
 
-        insights = get_city_insights_cached()
+        insights = get_city_insights_cached(_get_model())
     except Exception:
         insights = None
 

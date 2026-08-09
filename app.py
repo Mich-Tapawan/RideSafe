@@ -19,11 +19,11 @@ from scripts.summary_report import generate_summary_report
 from scripts.db import init_db, ping_database
 from scripts.seed_database import seed_database
 from scripts.cache import (
-    warm_dashboard_cache,
-    warm_insights_cache,
     get_dashboard_html,
     get_barangay_list_cached,
     get_city_insights_cached,
+    get_heat_map_html,
+    warm_insights_cache,
 )
 from scripts.rag import RagUnavailable, answer_question
 from scripts.build_rag_corpus import build_rag_corpus
@@ -91,34 +91,20 @@ def _build_rag_corpus_background():
         logging.exception("RAG corpus build failed; chat may be unavailable")
 
 
-def _warm_caches_background(model):
-    """Dashboard/insights HTML is heavy — do not block Gunicorn bind / Render deploy."""
-    try:
-        warm_dashboard_cache()
-        warm_insights_cache(model)
-    except Exception:
-        logging.exception("Cache warmup failed; first request may rebuild caches")
-
-
 def _initialize_app():
+    # Keep boot minimal for free Render: no Folium/insights warmup here (OOM / deploy timeout).
     init_db()
     seed_database()
     accident_model.load_model()
     accident_model.precompute_city_hour_averages()
     set_shared_model(accident_model)
     threading.Thread(
-        target=_warm_caches_background,
-        args=(accident_model,),
-        name="cache-warmup",
-        daemon=True,
-    ).start()
-    threading.Thread(
         target=_build_rag_corpus_background,
         name="rag-corpus-build",
         daemon=True,
     ).start()
     logging.info(
-        "RideSafe startup complete (dashboard cache + RAG corpus warming in background)."
+        "RideSafe startup complete (RAG corpus in background; dashboard caches are lazy)."
     )
 
 
@@ -232,6 +218,17 @@ def api_dashboard_insights():
     except Exception:
         logging.exception("Error in api_dashboard_insights")
         return jsonify({"error": "Unable to load city insights."}), 500
+
+
+@app.route("/api/dashboard/heatmap", methods=["GET"])
+@limiter.limit("20 per minute")
+def api_dashboard_heatmap():
+    """Lazy Folium HTML — kept off the startup path to avoid free-tier OOM."""
+    try:
+        return jsonify({"html": get_heat_map_html()})
+    except Exception:
+        logging.exception("Error in api_dashboard_heatmap")
+        return jsonify({"error": "Unable to load heatmap."}), 500
 
 
 @app.route("/api/dashboard/barangay-insight/<barangay>", methods=["GET"])

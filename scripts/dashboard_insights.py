@@ -44,7 +44,11 @@ def _incident_rankings(limit: int = 5) -> tuple[list[dict], list[dict]]:
         session.close()
 
 
-def _peak_risk_rankings(model, limit: int = 5) -> tuple[list[dict], list[dict]]:
+def _peak_risk_rankings(
+    model,
+    limit: int = 5,
+    candidate_limit: Optional[int] = None,
+) -> tuple[list[dict], list[dict]]:
     raw = getattr(model, "barangays", None)
     if raw is None:
         barangays: list[str] = []
@@ -53,6 +57,23 @@ def _peak_risk_rankings(model, limit: int = 5) -> tuple[list[dict], list[dict]]:
             barangays = [str(b) for b in list(raw)]
         except TypeError:
             barangays = []
+
+    # On lean hosts, only score a subset (hottest/safest by volume) instead of every barangay.
+    if candidate_limit is not None and candidate_limit > 0 and barangays:
+        hot, safe = _incident_rankings(max(candidate_limit, limit))
+        ordered: list[str] = []
+        for row in hot + safe:
+            name = row["barangay"]
+            if name not in ordered:
+                ordered.append(name)
+        if len(ordered) < candidate_limit:
+            for name in barangays:
+                if name not in ordered:
+                    ordered.append(name)
+                if len(ordered) >= candidate_limit:
+                    break
+        barangays = ordered[:candidate_limit]
+
     rows: list[dict[str, Any]] = []
     for name in barangays:
         try:
@@ -78,7 +99,7 @@ def _peak_risk_rankings(model, limit: int = 5) -> tuple[list[dict], list[dict]]:
     return highest, lowest
 
 
-def build_city_insights(model) -> dict[str, Any]:
+def build_city_insights(model, lean: bool = False) -> dict[str, Any]:
     """Aggregate KPIs, rankings, and city hour-risk series for the Overview."""
     yearly = _yearly_totals()
     total = sum(yearly.values())
@@ -90,7 +111,10 @@ def build_city_insights(model) -> dict[str, Any]:
         )
 
     hotspots, safest = _incident_rankings(5)
-    peak_high, peak_low = _peak_risk_rankings(model, 5)
+    # Full scan OOMs free Render; lean scores ~16 volume leaders only.
+    peak_high, peak_low = _peak_risk_rankings(
+        model, 5, candidate_limit=16 if lean else None
+    )
 
     averages = getattr(model, "city_hour_averages", None) or {}
     hour_risk = [

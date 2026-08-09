@@ -150,7 +150,7 @@ In the Render dashboard, set:
 
 Health checks use `/health`.
 
-The Docker entrypoint starts Gunicorn immediately. On import the app seeds analytics if empty, loads the ML model, then warms the **dashboard/insights caches and RAG corpus in background threads** so Render health checks pass before the heavy HTML/embedding work finishes. The first `/` request will build caches on demand if warmup is still running.
+The Docker entrypoint starts Gunicorn immediately. On import the app seeds analytics if empty, loads the ML model, and may build the RAG corpus in a background thread. **Dashboard charts, Folium heatmap, and city insights are lazy** (first page/API use) so free Render does not OOM during deploy. Heatmap is fetched via `/api/dashboard/heatmap` when you open that view.
 
 On **Render free**, Ask RideSafe runs in lean mode (`RENDER=true`): prefer live tools over embedding when possible, shorter Gemini timeouts, and Gunicorn worker recycling — ask concise questions if a request fails.
 
@@ -214,7 +214,7 @@ Runtime reads from the database, not the xlsx file. To refresh data:
 
 ## Architecture
 
-On startup the app: initializes the DB → seeds from xlsx (if empty) → loads the ML model → precomputes city-hour averages → then warms dashboard/insights caches and the RAG corpus in **background threads** so `/health` can succeed during Render deploys.
+On startup the app: initializes the DB → seeds from xlsx (if empty) → loads the ML model → precomputes city-hour averages → builds RAG in the background. Dashboard charts, Folium heatmap, and insights load **lazily** on first use (avoids free-tier OOM during Render deploys).
 
 The homepage and barangay list are served from in-memory cache. API endpoints query Postgres/SQLite. PDF reports combine DB incident history with ML predictions. Chat retrieves embedded insight chunks via pgvector cosine search and may call allowlisted tools (incident rankings, offense breakdowns, monthly totals, barangay summaries, ML hour risk) — never free-form SQL — then answers with Gemini.
 
@@ -273,6 +273,7 @@ RideSafe/
 | `/api/chat/admin/login`        | POST   | Unlock admin (`password`)                                         |
 | `/api/chat/admin/logout`       | POST   | Exit admin mode                                                   |
 | `/api/dashboard/insights`      | GET    | Cached city KPIs, hotspot/peak-risk rankings, hour-risk series    |
+| `/api/dashboard/heatmap`       | GET    | Lazy Folium heatmap HTML (`{ html }`)                             |
 | `/api/dashboard/barangay-insight/<barangay>` | GET | Compact barangay insight (`?hour=` optional)               |
 | `/getMonthData`                | POST   | Monthly accident statistics (`year`, `month`)                     |
 | `/predict`                     | POST   | ML accident probability (`barangay`, `hour`)                      |

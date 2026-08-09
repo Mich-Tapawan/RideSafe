@@ -1750,6 +1750,15 @@ button.nav-btn {
   overflow: auto;
 }
 
+.heat-map-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 280px;
+  color: var(--text-muted);
+  font-size: 0.95rem;
+}
+
 #heat-map .folium-map,
 #heat-map iframe {
   max-width: 100% !important;

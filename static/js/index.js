@@ -40,8 +40,42 @@ document.addEventListener("DOMContentLoaded", () => {
   const viewPanels = document.querySelectorAll(".view-panel[data-view]");
   const contentViewport = document.querySelector(".content-viewport");
   let activeView = null;
+  let heatMapLoadPromise = null;
 
   const api = (path) => path;
+
+  function ensureHeatMapLoaded() {
+    if (!heatMap) {
+      return Promise.resolve();
+    }
+    const pending = heatMap.querySelector("[data-heatmap-pending]");
+    if (!pending && heatMap.querySelector("iframe, .folium-map, .leaflet-container")) {
+      return Promise.resolve();
+    }
+    if (heatMapLoadPromise) {
+      return heatMapLoadPromise;
+    }
+    heatMapLoadPromise = fetch(api("/api/dashboard/heatmap"))
+      .then((res) => {
+        if (!res.ok) {
+          throw new Error("Heatmap request failed");
+        }
+        return res.json();
+      })
+      .then((data) => {
+        if (data && data.html) {
+          heatMap.innerHTML = data.html;
+          requestAnimationFrame(() => notifyVizResize());
+        }
+      })
+      .catch((err) => {
+        console.error(err);
+        heatMap.innerHTML =
+          '<div class="heat-map-placeholder"><p>Unable to load map. Try again shortly.</p></div>';
+        heatMapLoadPromise = null;
+      });
+    return heatMapLoadPromise;
+  }
 
   function setSearchResultVisible(visible) {
     if (!searchResult) {
@@ -141,6 +175,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (viewChanged && contentViewport) {
       contentViewport.scrollTop = 0;
+    }
+
+    if (view === "heatmap") {
+      ensureHeatMapLoaded();
     }
 
     closeMobileSidebar();
