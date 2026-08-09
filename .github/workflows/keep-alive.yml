@@ -1,23 +1,25 @@
-# Pings Render /health so the free-tier web service is less likely to sleep.
-# Setup: Repo Settings → Secrets and variables → Actions → New repository variable
-#   Name: RENDER_URL
-#   Value: https://your-service.onrender.com  (no trailing slash)
+# Keeps free-tier Render + Supabase from sleeping.
 #
-# Or set the same name as a secret if you prefer not to expose the URL in logs.
+# Setup (GitHub → Settings → Secrets and variables → Actions):
+#   Variable or secret RENDER_URL = https://your-service.onrender.com  (no trailing slash)
+#   Optional secret DATABASE_URL  = Supabase pooler URI (direct SELECT 1 backup)
+#
+# /health     — Render liveness (no DB)
+# /health/db  — runs SELECT 1 against Postgres (prevents Supabase 7-day pause)
 
-name: Keep Render awake
+name: Keep free tiers awake
 
 on:
   schedule:
-    # Every 10 minutes (Render free tier spins down after ~15 min idle)
+    # Every 10 minutes (Render free spins down ~15 min; Supabase pauses ~7 days idle)
     - cron: "*/10 * * * *"
   workflow_dispatch:
 
 jobs:
-  ping:
+  ping-render:
     runs-on: ubuntu-latest
     steps:
-      - name: Ping /health
+      - name: Ping Render /health and /health/db
         env:
           RENDER_URL_VAR: ${{ vars.RENDER_URL }}
           RENDER_URL_SECRET: ${{ secrets.RENDER_URL }}
@@ -31,4 +33,45 @@ jobs:
           echo "Pinging ${BASE}/health"
           curl -fsS --max-time 180 "${BASE}/health"
           echo
+          echo "Pinging ${BASE}/health/db (touches Supabase)"
+          curl -fsS --max-time 180 "${BASE}/health/db"
+          echo
           echo "OK"
+
+  ping-supabase-direct:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Direct SELECT 1 on DATABASE_URL (optional backup)
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "No DATABASE_URL secret set — skipping direct DB ping (Render /health/db is enough if it succeeds)."
+            exit 0
+          fi
+          python -m pip install --quiet psycopg2-binary==2.9.12
+          python - <<'PY'
+          import os
+          from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
+
+          import psycopg2
+
+          url = os.environ["DATABASE_URL"].strip()
+          if url.startswith("postgres://"):
+              url = "postgresql://" + url[len("postgres://") :]
+          parsed = urlparse(url)
+          query = parse_qs(parsed.query, keep_blank_values=True)
+          host = (parsed.hostname or "").lower()
+          if host not in {"localhost", "127.0.0.1", "db"} and "sslmode" not in query:
+              query["sslmode"] = ["require"]
+              flat = [(k, v) for k, vals in query.items() for v in vals]
+              url = urlunparse(parsed._replace(query=urlencode(flat)))
+          conn = psycopg2.connect(url)
+          try:
+              with conn.cursor() as cur:
+                  cur.execute("SELECT 1")
+                  assert cur.fetchone()[0] == 1
+              print("Supabase direct ping OK")
+          finally:
+              conn.close()
+          PY

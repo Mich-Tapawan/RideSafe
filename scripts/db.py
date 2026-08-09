@@ -221,6 +221,14 @@ def get_session():
     return SessionLocal()
 
 
+def ping_database() -> bool:
+    """Lightweight connectivity check (keeps free-tier DBs from auto-pausing)."""
+    init_db()
+    with _engine.connect() as conn:
+        conn.execute(text("SELECT 1"))
+    return True
+
+
 def incident_count(session) -> int:
     return session.query(func.count(Incident.id)).scalar() or 0
 

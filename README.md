@@ -158,15 +158,18 @@ On **Render free**, Ask RideSafe runs in lean mode (`RENDER=true`): prefer live 
 
 ### Keeping the free tier awake
 
-Render’s free web service sleeps after ~15 minutes of idle traffic. To reduce cold starts:
+**Render** free web services sleep after ~15 minutes idle. **Supabase** free databases can pause after ~7 days with no activity. The included workflow fights both:
 
-1. **GitHub Actions (included)** — [`.github/workflows/keep-alive.yml`](.github/workflows/keep-alive.yml) pings `/health` every 10 minutes.
-   - After deploy, set a repository **variable** (or secret): `RENDER_URL` = `https://your-service.onrender.com` (no trailing slash).
-   - Path: GitHub repo → **Settings** → **Secrets and variables** → **Actions** → **Variables** → New variable.
-   - You can also run it manually under **Actions** → **Keep Render awake** → **Run workflow**.
-2. **UptimeRobot (optional)** — Create an HTTP monitor on `https://your-service.onrender.com/health` every 5–10 minutes.
+1. **GitHub Actions** — [`.github/workflows/keep-alive.yml`](.github/workflows/keep-alive.yml) every 10 minutes:
+   - Pings `/health` (wakes Render)
+   - Pings `/health/db` (runs `SELECT 1` on Postgres → keeps Supabase active)
+   - Optional: set secret `DATABASE_URL` (same Supabase pooler URI as Render) for a direct DB ping backup
+   - Required: repository **variable** (or secret) `RENDER_URL` = `https://your-service.onrender.com` (no trailing slash)
+   - Path: GitHub repo → **Settings** → **Secrets and variables** → **Actions**
+   - Manual run: **Actions** → **Keep free tiers awake** → **Run workflow**
+2. **UptimeRobot (optional)** — Monitor `…/health/db` every 5–10 minutes (touches both Render and Supabase).
 
-Always ping **`/health`**, not `/` (the homepage is expensive to generate).
+Do **not** use `/` for uptime monitors (homepage is expensive). Keep Render’s native health check on **`/health`** (no DB dependency).
 
 ## Environment variables
 
@@ -261,7 +264,8 @@ RideSafe/
 
 | Endpoint                       | Method | Description                                                       |
 | ------------------------------ | ------ | ----------------------------------------------------------------- |
-| `/health`                      | GET    | Health check (`{"status": "ok"}`)                               |
+| `/health`                      | GET    | Liveness (`{"status": "ok"}`) — no DB                         |
+| `/health/db`                   | GET    | DB keepalive (`SELECT 1`); use for Supabase free-tier pings     |
 | `/`                            | GET    | Sidebar dashboard (Overview / Offense / Heatmap / Predictions / Ask); hashes `#overview` `#offense` `#heatmap` `#predict` `#ask` |
 | `/chat`                        | GET    | Redirects to `/?view=ask` (Ask RideSafe view)                     |
 | `/api/chat`                    | POST   | RAG + live tools (`message`); guest limit 3/hour; admin unlimited |

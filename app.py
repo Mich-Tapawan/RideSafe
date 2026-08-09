@@ -16,7 +16,7 @@ from io import BytesIO
 from scripts.month_data import generate_month_list
 from scripts.model import AccidentModel
 from scripts.summary_report import generate_summary_report
-from scripts.db import init_db
+from scripts.db import init_db, ping_database
 from scripts.seed_database import seed_database
 from scripts.cache import (
     warm_dashboard_cache,
@@ -112,7 +112,19 @@ _initialize_app()
 
 @app.route("/health")
 def health():
+    """Liveness only — must stay DB-free so Render health checks stay green."""
     return jsonify({"status": "ok"})
+
+
+@app.route("/health/db")
+def health_db():
+    """Readiness / keepalive — touches Postgres so Supabase free tier stays active."""
+    try:
+        ping_database()
+        return jsonify({"status": "ok", "database": "up"})
+    except Exception:
+        logging.exception("Database health check failed")
+        return jsonify({"status": "error", "database": "down"}), 503
 
 
 @app.route("/")
